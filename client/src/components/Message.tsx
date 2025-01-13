@@ -171,11 +171,11 @@ export function Message({ message, isLastInGroup }: MessageProps) {
           <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                  <MoreVertical className="h-4 w-4" />
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10">
+                  <MoreVertical className="h-4 w-4 text-gray-400 hover:text-white" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-[140px]">
                 <DropdownMenuItem onClick={handleEdit}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit
