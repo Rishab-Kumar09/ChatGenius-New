@@ -1012,7 +1012,7 @@ export function registerRoutes(app: Express): Server {
       // Delete all channel members
       await db
         .delete(channelMembers)
-        .where(eqchannelMembers.channelId, channelId));
+        .where(eq(channelMembers.channelId, channelId));
 
       // Delete all channel invitations
       await db
