@@ -4,12 +4,22 @@ import { UserAvatar } from "./UserAvatar";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, ChevronDown, ChevronRight, Smile, Paperclip, Maximize2, X } from "lucide-react";
+import { MessageSquare, ChevronDown, ChevronRight, Smile, Paperclip, Maximize2, X, Trash2 } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MessageThreadProps {
   messages: Message[];
@@ -17,6 +27,7 @@ interface MessageThreadProps {
   replyingTo?: Message | null;
   currentUserId: string;
   onReaction?: (messageId: string, emoji: string) => void;
+  onDelete?: (messageId: string) => Promise<void>;
 }
 
 interface GroupedReaction {
@@ -36,12 +47,14 @@ export function MessageThread({
   replyingTo,
   currentUserId,
   onReaction,
+  onDelete,
 }: MessageThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [activeEmojiCategory, setActiveEmojiCategory] = useState('common');
   const [removingReactions, setRemovingReactions] = useState<Set<string>>(new Set());
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
@@ -261,6 +274,27 @@ export function MessageThread({
     }
   };
 
+  const handleDeleteMessage = async () => {
+    if (!messageToDelete || !onDelete) return;
+
+    try {
+      await onDelete(messageToDelete);
+      toast({
+        title: "Message deleted",
+        description: "Your message has been deleted successfully."
+      });
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete message",
+        variant: "destructive"
+      });
+    } finally {
+      setMessageToDelete(null);
+    }
+  };
+
   // Render a single message with its replies
   const renderMessage = (message: GroupedMessage) => {
     const isBeingRepliedTo = replyingTo?.id === message.id;
@@ -472,6 +506,16 @@ export function MessageThread({
                   >
                     Reply
                   </button>
+
+                  {message.sender.id.toString() === currentUserId && (
+                    <button
+                      className="text-muted-foreground hover:text-destructive hover:underline"
+                      onClick={() => setMessageToDelete(message.id.toString())}
+                    >
+                      Delete
+                    </button>
+                  )}
+
                   {hasReplies && (
                     <button
                       className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
@@ -526,6 +570,26 @@ export function MessageThread({
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!messageToDelete} onOpenChange={() => setMessageToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Message</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this message? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteMessage}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

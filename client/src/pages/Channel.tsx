@@ -254,6 +254,28 @@ export function Channel() {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      const response = await fetch(`/api/messages/${messageId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      // Optimistically update the UI
+      queryClient.setQueryData<Message[]>(['/api/messages', channelId], (old) => {
+        if (!old) return [];
+        return old.filter(message => message.id.toString() !== messageId);
+      });
+
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -343,6 +365,7 @@ export function Channel() {
                     onReply={handleReply}
                     replyingTo={replyingTo}
                     onReaction={handleReaction}
+                    onDelete={handleDeleteMessage}
                   />
                 </div>
               </div>

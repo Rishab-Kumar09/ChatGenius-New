@@ -174,6 +174,33 @@ export function DirectMessage() {
     setReplyingTo(threadMessage);
   }, []);
 
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      const response = await fetch(`/api/messages/${messageId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      // Optimistically update the UI
+      queryClient.setQueryData<Message[]>(['/api/messages', id], (old) => {
+        if (!old) return [];
+        return old.filter(message => message.id.toString() !== messageId);
+      });
+
+      // Invalidate conversations to update sidebar
+      await queryClient.invalidateQueries({
+        queryKey: ['/api/messages/conversations']
+      });
+
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      throw error;
+    }
+  };
+
   if (!recipientUser) {
     return null;
   }
@@ -207,6 +234,7 @@ export function DirectMessage() {
                 onReply={handleReply}
                 replyingTo={replyingTo}
                 onReaction={handleReaction}
+                onDelete={handleDeleteMessage}
               />
             </div>
           </div>

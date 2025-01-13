@@ -25,7 +25,8 @@ type SSEEventType =
   | 'error'
   | 'typing'
   | 'connected'
-  | 'conversation_update';
+  | 'conversation_update'
+  | 'message_deleted';
 
 interface SSEEvent {
   type: SSEEventType;
@@ -813,11 +814,11 @@ export function registerRoutes(app: Express): Server {
       const query = req.query.query as string;
       const type = req.query.type as string;
       const currentUserId = req.user!.id;
-
+      
       if (!query) {
         return res.json({ messages: [], channels: [], users: [] });
       }
-
+      
       // If type is 'users', only search users
       if (type === 'users') {
         const foundUsers = await db
@@ -878,13 +879,12 @@ export function registerRoutes(app: Express): Server {
         id: message.id,
         content: message.content,
         channelId: message.channelId,
-        parentId: message.parentId,
-        replyCount: message.replyCount,
-        createdAt: message.createdAt,
+        dmId: message.recipientId,
+        timestamp: message.createdAt,
         sender
       }));
 
-      res.json({
+      res.json({ 
         users: foundUsers,
         channels: foundChannels,
         messages: formattedMessages
@@ -1667,6 +1667,55 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Failed to leave channel:', error);
       res.status(500).json({ error: "Failed to leave channel" });
+    }
+  });
+
+  // Delete message endpoint
+  app.delete("/api/messages/:messageId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const messageId = parseInt(req.params.messageId);
+      const userId = req.user!.id;
+
+      // Check if message exists and belongs to the user
+      const [message] = await db
+        .select()
+        .from(messages)
+        .where(
+          and(
+            eq(messages.id, messageId),
+            eq(messages.senderId, userId)
+          )
+        )
+        .limit(1);
+
+      if (!message) {
+        return res.status(404).json({ error: "Message not found or you don't have permission to delete it" });
+      }
+
+      // Delete message reactions first
+      await db
+        .delete(reactions)
+        .where(eq(reactions.messageId, messageId));
+
+      // Delete the message
+      await db
+        .delete(messages)
+        .where(eq(messages.id, messageId));
+
+      // Broadcast message deletion event
+      broadcastEvent({
+        type: 'message_deleted',
+        data: {
+          messageId,
+          channelId: message.channelId,
+          recipientId: message.recipientId
+        }
+      });
+
+      res.json({ message: "Message deleted successfully" });
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      res.status(500).json({ error: "Failed to delete message" });
     }
   });
 

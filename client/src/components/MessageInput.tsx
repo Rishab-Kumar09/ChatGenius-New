@@ -1,18 +1,60 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { SendHorizontal, Paperclip, X, Reply, Smile, Image, File, Maximize2 } from "lucide-react";
+import { SendHorizontal, Paperclip, X, Reply, Smile, Image, File, Maximize2, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Message } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
 
-const COMMON_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🙏",
-  "✨", "🔥", "💯", "⭐", "💪", "👀", "🤔", "👏"
-];
+// Emoji sets for each category
+const emojisByCategory = {
+  common: [
+    "👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🙏",
+    "✨", "🔥", "💯", "⭐", "💪", "👀", "🤔", "👏"
+  ],
+  smileys: [
+    "😀", "😃", "😄", "😁", "😅", "😂", "🤣", "😊",
+    "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘",
+    "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪",
+    "🤨", "🧐", "🤓", "😎", "🥸", "🤩", "🥳", "😏"
+  ],
+  hearts: [
+    "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍",
+    "🤎", "💔", "❤️‍🔥", "❤️‍🩹", "💖", "💗", "💓", "💞",
+    "💕", "💝", "💘", "💟", "💌", "💋", "💄", "💎"
+  ],
+  hands: [
+    "👍", "👎", "👊", "✊", "🤛", "🤜", "🤞", "✌️",
+    "🤟", "🤘", "👌", "🤌", "🤏", "👈", "👉", "👆",
+    "👇", "☝️", "👋", "🤚", "✋", "🖐️", "🖖", "👏",
+    "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💅", "🤳"
+  ],
+  symbols: [
+    "⭐", "✨", "💫", "🌟", "⚡", "🔥", "💥", "🎯",
+    "💯", "❗", "❓", "💭", "💬", "👥", "🔍", "📍",
+    "💡", "✅", "❌", "⭕", "❤️", "💤", "💈", "🎵"
+  ],
+  activities: [
+    "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏉", "🎱",
+    "🎮", "🎲", "🎭", "🎨", "🎬", "🎤", "🎧", "🎸",
+    "🎹", "🎯", "🎳", "🎪", "🎠", "🎡", "🎢", "🎪"
+  ],
+  nature: [
+    "🌺", "🌸", "🌼", "🌻", "🌹", "🌷", "🌱", "🌲",
+    "🌳", "🌴", "🌵", "���", "🌿", "☘️", "🍀", "🍁",
+    "🍂", "🍃", "🌍", "🌎", "🌏", "🌞", "🌛", "⭐"
+  ],
+  food: [
+    "🍔", "🍟", "🍕", "🌭", "🍿", "🧂", "🥨", "🥯",
+    "🥖", "🫓", "🥪", "🌮", "🌯", "🫔", "🥙", "🧆",
+    "🥚", "🍳", "🥘", "🍲", "🥣", "🥗", "🍿", "🧈"
+  ]
+};
 
 interface MessageInputProps {
   onSend: (content: string, file?: File) => Promise<void>;
@@ -37,6 +79,7 @@ export function MessageInput({
   const [isSending, setIsSending] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
+  const [activeEmojiCategory, setActiveEmojiCategory] = useState('common');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Create preview URLs for files
@@ -256,19 +299,62 @@ export function MessageInput({
                 <Smile className="h-5 w-5" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-2" sideOffset={5}>
-              <div className="flex gap-1 flex-wrap max-w-[200px]">
-                {COMMON_EMOJIS.map((emoji) => (
-                  <Button
-                    key={emoji}
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:scale-110 hover:bg-primary/10"
-                    onClick={() => insertEmoji(emoji)}
+            <PopoverContent 
+              className="w-[320px] p-0 shadow-lg rounded-lg overflow-hidden border bg-popover" 
+              align="end" 
+              sideOffset={5}
+            >
+              {/* Category tabs */}
+              <div className="border-b flex items-center p-2 gap-1.5 bg-muted/50">
+                {[
+                  { id: 'common', icon: '⭐', label: 'Common' },
+                  { id: 'smileys', icon: '😀', label: 'Smileys' },
+                  { id: 'hearts', icon: '❤️', label: 'Hearts' },
+                  { id: 'hands', icon: '👋', label: 'Hands' },
+                  { id: 'symbols', icon: '✨', label: 'Symbols' },
+                  { id: 'activities', icon: '⚽', label: 'Activities' },
+                  { id: 'nature', icon: '🌺', label: 'Nature' },
+                  { id: 'food', icon: '🍔', label: 'Food' }
+                ].map(category => (
+                  <Button 
+                    key={category.id}
+                    variant={activeEmojiCategory === category.id ? "secondary" : "ghost"}
+                    size="sm" 
+                    onClick={() => setActiveEmojiCategory(category.id)}
+                    className={cn(
+                      "h-8 w-8 p-0 flex items-center justify-center relative group",
+                      activeEmojiCategory === category.id && "bg-background shadow-sm"
+                    )}
                   >
-                    {emoji}
+                    <span className="text-lg">{category.icon}</span>
+                    <span className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 
+                      text-xs bg-popover px-2 py-1 rounded-md border shadow-sm
+                      opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {category.label}
+                    </span>
                   </Button>
                 ))}
+              </div>
+
+              <ScrollArea className="h-[300px]">
+                <div className="p-2">
+                  <div className="grid grid-cols-8 gap-1">
+                    {emojisByCategory[activeEmojiCategory as keyof typeof emojisByCategory].map(emoji => (
+                      <button
+                        key={emoji}
+                        onClick={() => insertEmoji(emoji)}
+                        className="hover:bg-accent p-1.5 rounded-md text-xl"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </ScrollArea>
+              <div className="p-2 border-t text-center">
+                <span className="text-xs text-muted-foreground">
+                  Emoji Picker by Rishab Kumar ©️ 2025
+                </span>
               </div>
             </PopoverContent>
           </Popover>
