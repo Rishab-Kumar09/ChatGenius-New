@@ -170,8 +170,8 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             {formatTimestamp(message.timestamp)}
             {message.isEdited && " (edited)"}
           </span>
-          {message.sender.id === parseInt(user?.id || '0', 10) && (
-            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          {message.sender.id === user?.id && (
+            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10 focus:ring-0">
