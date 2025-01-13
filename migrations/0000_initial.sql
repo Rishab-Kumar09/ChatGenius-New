@@ -43,10 +43,3 @@ CREATE TABLE IF NOT EXISTS channel_members (
   FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
--- Clean up any existing duplicate channels by keeping only the oldest one for each name
-DELETE FROM channels 
-WHERE id NOT IN (
-  SELECT MIN(id) 
-  FROM channels 
-  GROUP BY name
-);
