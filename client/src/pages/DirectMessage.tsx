@@ -1,4 +1,4 @@
-import { useParams } from "wouter";
+import { useParams, useNavigate } from "wouter";
 import { MessageInput } from "@/components/MessageInput";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useWebSocket } from "@/lib/useWebSocket";
@@ -13,9 +13,12 @@ import { MessageThread } from "@/components/MessageThread";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 export function DirectMessage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { messages: wsMessages, isConnected, presenceUpdates, sendReaction } = useWebSocket();
   const { user: currentUser } = useUser();
   const { toast } = useToast();
@@ -112,7 +115,7 @@ export function DirectMessage() {
       await queryClient.invalidateQueries({
         queryKey: ['/api/messages/conversations']
       });
-      
+
       // Clear reply state
       setReplyingTo(null);
     } catch (error) {
@@ -148,10 +151,10 @@ export function DirectMessage() {
       }
 
       console.log('🎯 Adding reaction:', { messageId, emoji, currentUser });
-      
+
       // Send reaction through WebSocket
       await sendReaction(messageId, emoji, currentUser.id);
-      
+
       console.log('✅ Reaction sent successfully');
 
     } catch (error) {
@@ -184,16 +187,53 @@ export function DirectMessage() {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b p-4">
-        <div className="flex items-center gap-3">
-          <UserAvatar user={recipientUser} className="h-10 w-10" interactive />
-          <div>
-            <h1 className="text-xl font-semibold">
-              {recipientUser?.displayName || recipientUser?.username || 'Loading...'}
-            </h1>
-            {recipientUser?.status && (
-              <p className="text-sm text-muted-foreground">{recipientUser.status}</p>
-            )}
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-3">
+            <UserAvatar user={recipientUser} className="h-10 w-10" interactive />
+            <div>
+              <h1 className="text-xl font-semibold">
+                {recipientUser?.displayName || recipientUser?.username || 'Loading...'}
+              </h1>
+              {recipientUser?.status && (
+                <p className="text-sm text-muted-foreground">{recipientUser.status}</p>
+              )}
+            </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 hover:bg-red-500/10"
+            onClick={async () => {
+              const confirmed = window.confirm("Are you sure you want to delete this conversation? This cannot be undone.");
+              if (!confirmed) return;
+
+              try {
+                const response = await fetch(`/api/messages/conversation/${id}`, {
+                  method: 'DELETE',
+                });
+
+                if (!response.ok) throw new Error('Failed to delete conversation');
+
+                // Refetch conversations list
+                queryClient.invalidateQueries({ queryKey: ['/api/messages/conversations'] });
+                // Navigate back to home
+                navigate('/');
+
+                toast({
+                  title: "Success",
+                  description: "Conversation deleted successfully",
+                });
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: "Failed to delete conversation",
+                  variant: "destructive"
+                });
+              }
+            }}
+          >
+            <Trash2 className="h-5 w-5 text-red-500" />
+          </Button>
         </div>
       </div>
 

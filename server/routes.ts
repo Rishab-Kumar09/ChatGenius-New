@@ -1735,6 +1735,37 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Delete entire DM conversation
+  app.delete("/api/messages/conversation/:recipientId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const recipientId = parseInt(req.params.recipientId);
+      const userId = req.user!.id;
+
+      // Delete all messages between these users (only for the current user)
+      await db
+        .delete(messages)
+        .where(
+          and(
+            or(
+              and(
+                eq(messages.senderId, userId),
+                eq(messages.recipientId, recipientId)
+              ),
+              and(
+                eq(messages.senderId, recipientId),
+                eq(messages.recipientId, userId)
+              )
+            )
+          )
+        );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      res.status(500).json({ error: "Failed to delete conversation" });
+    }
+  });
+
   // Delete message
   app.delete("/api/messages/:id", requireAuth, async (req: Request, res: Response) => {
     try {
