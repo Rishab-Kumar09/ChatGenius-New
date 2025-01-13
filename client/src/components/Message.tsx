@@ -170,7 +170,7 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             {formatTimestamp(message.timestamp)}
             {message.isEdited && " (edited)"}
           </span>
-          <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center">
+          <div className="ml-auto opacity-100 flex items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10 focus:ring-0">
@@ -218,7 +218,7 @@ export function Message({ message, isLastInGroup }: MessageProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-6 px-2 text-xs opacity-100"
             onClick={handleEdit}
           >
             <Pencil className="h-3 w-3 mr-1" />
