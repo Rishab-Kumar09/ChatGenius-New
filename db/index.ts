@@ -7,7 +7,8 @@ import path from 'path';
 // Create SQLite database connection with better error handling
 function createDatabaseConnection() {
   try {
-    const dbPath = 'chat.db';
+    const dbPath = path.resolve(process.cwd(), 'chat.db');
+    console.log('Database path:', dbPath);
 
     // Create database directory if it doesn't exist
     const dbDir = path.dirname(dbPath);
@@ -15,12 +16,18 @@ function createDatabaseConnection() {
       fs.mkdirSync(dbDir, { recursive: true });
     }
 
-    const sqlite = new Database(dbPath);
+    // Check if database exists, if not create it
+    const dbExists = fs.existsSync(dbPath);
+    
+    const sqlite = new Database(dbPath, {
+      verbose: console.log // Log all queries
+    });
 
-    // Enable foreign keys support
-    sqlite.exec('PRAGMA foreign_keys = ON;');
-
-    console.log('SQLite database connection established');
+    // Enable foreign keys and WAL mode for better performance and reliability
+    sqlite.pragma('foreign_keys = ON');
+    sqlite.pragma('journal_mode = WAL');
+    
+    console.log(`SQLite database ${dbExists ? 'opened' : 'created'} at: ${dbPath}`);
     return sqlite;
   } catch (error) {
     console.error('Failed to create SQLite database connection:', error);

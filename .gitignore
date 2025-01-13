@@ -32,3 +32,7 @@ yarn-error.log*
 /uploads/*
 /client/public/uploads
 /client/public/uploads/*
+
+# Database
+*.db
+*.db-journal
