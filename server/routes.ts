@@ -59,7 +59,7 @@ export function registerRoutes(app: Express): Server {
   httpServer.on('upgrade', (request, socket, head) => {
     try {
       const url = new URL(request.url || '', `http://${request.headers.host}`);
-      
+
       // Let Vite handle its own WebSocket connections
       if (url.pathname.startsWith('/@vite/client') || url.pathname.startsWith('/vite-hmr')) {
         console.log('Vite HMR WebSocket request, ignoring');
@@ -113,7 +113,7 @@ export function registerRoutes(app: Express): Server {
 
           case 'reaction_update':
             const { messageId, emoji, userId } = event;
-            
+
             try {
               await db.transaction(async (tx) => {
                 // Efficient single query to check and handle reaction
@@ -288,18 +288,18 @@ export function registerRoutes(app: Express): Server {
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
       // Determine the upload path based on file type
-      let uploadPath = path.join(process.cwd(), 'uploads');
-      
+      let uploadPath = path.join(process.env.HOME || process.cwd(), '.data', 'uploads');
+
       // If it's an avatar upload, use the avatars subdirectory
       if (file.fieldname === 'avatar') {
-        uploadPath = path.join(process.cwd(), 'uploads', 'avatars');
+        uploadPath = path.join(process.env.HOME || process.cwd(), '.data', 'uploads', 'avatars');
       }
-      
+
       // Create directory if it doesn't exist
       if (!fs.existsSync(uploadPath)) {
         fs.mkdirSync(uploadPath, { recursive: true });
       }
-      
+
       cb(null, uploadPath);
     },
     filename: (_req, file, cb) => {
@@ -315,7 +315,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Serve uploaded files
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  app.use('/uploads', express.static(path.join(process.env.HOME || process.cwd(), '.data', 'uploads')));
 
   // Add file upload to messages endpoint
   app.post("/api/messages", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
@@ -331,9 +331,9 @@ export function registerRoutes(app: Express): Server {
 
       // Check if file exists and is readable
       if (req.file) {
-        const filePath = path.join(process.cwd(), 'uploads', req.file.filename);
+        const filePath = path.join(process.env.HOME || process.cwd(), '.data', 'uploads', req.file.filename);
         console.log('Checking file at path:', filePath);
-        
+
         if (!fs.existsSync(filePath)) {
           console.error('File does not exist at path:', filePath);
           return res.status(500).json({ error: "File upload failed - file not found" });
@@ -439,7 +439,7 @@ export function registerRoutes(app: Express): Server {
       console.log('GET /api/messages - Query params:', { channelId, recipientId, currentUserId });
 
       let messageQuery;
-      
+
       if (channelId) {
         const channelIdNum = parseInt(channelId as string, 10);
         if (isNaN(channelIdNum)) {
@@ -468,7 +468,7 @@ export function registerRoutes(app: Express): Server {
           return res.status(400).json({ error: "Invalid recipient ID" });
         }
         console.log('Fetching DM messages between users:', { currentUserId, recipientIdNum });
-        
+
         // Get DM messages with replies between current user and recipient
         messageQuery = db
           .select({
@@ -501,7 +501,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const results = await messageQuery;
-      
+
       // Format messages and include reply counts
       const formattedMessages = await Promise.all(results.map(async ({ message, sender }) => {
         // Fetch reactions for this message
@@ -543,7 +543,7 @@ export function registerRoutes(app: Express): Server {
 
       // Get all message IDs to fetch their replies
       const messageIds = formattedMessages.map(m => parseInt(m.id));
-      
+
       // Fetch all replies for these messages
       const repliesQuery = await db
         .select({
@@ -583,7 +583,7 @@ export function registerRoutes(app: Express): Server {
 
       // Combine messages and replies
       const allMessages = [...formattedMessages, ...replies];
-      
+
       res.json(allMessages);
     } catch (error) {
       console.error('Failed to fetch messages:', error);
@@ -1012,7 +1012,7 @@ export function registerRoutes(app: Express): Server {
       // Delete all channel members
       await db
         .delete(channelMembers)
-        .where(eq(channelMembers.channelId, channelId));
+        .where(eqchannelMembers.channelId, channelId));
 
       // Delete all channel invitations
       await db
@@ -1232,9 +1232,9 @@ export function registerRoutes(app: Express): Server {
       const { messageId } = req.params;
       const { emoji } = req.body;
       const userId = req.user!.id;
-      
+
       console.log('Handling reaction:', { messageId, emoji, userId });
-      
+
       if (!emoji) {
         return res.status(400).json({ error: 'Missing emoji' });
       }

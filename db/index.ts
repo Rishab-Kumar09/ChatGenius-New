@@ -7,7 +7,7 @@ import path from 'path';
 // Create SQLite database connection with better error handling
 function createDatabaseConnection() {
   try {
-    const dbPath = path.resolve(process.cwd(), 'chat.db');
+    const dbPath = process.env.REPL_DB_PATH || path.join(process.env.HOME || process.cwd(), '.data', 'chat.db');
     console.log('Database path:', dbPath);
 
     // Create database directory if it doesn't exist
