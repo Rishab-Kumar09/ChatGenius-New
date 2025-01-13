@@ -18,7 +18,7 @@ function createDatabaseConnection() {
 
     // Check if database exists, if not create it
     const dbExists = fs.existsSync(dbPath);
-    
+
     const sqlite = new Database(dbPath, {
       verbose: console.log // Log all queries
     });
@@ -26,7 +26,7 @@ function createDatabaseConnection() {
     // Enable foreign keys and WAL mode for better performance and reliability
     sqlite.pragma('foreign_keys = ON');
     sqlite.pragma('journal_mode = WAL');
-    
+
     console.log(`SQLite database ${dbExists ? 'opened' : 'created'} at: ${dbPath}`);
     return sqlite;
   } catch (error) {
@@ -70,9 +70,7 @@ export async function initializeDatabase() {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Drop and recreate messages table to ensure correct schema
-      DROP TABLE IF EXISTS messages;
-      CREATE TABLE messages (
+      CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         content TEXT NOT NULL,
         sender_id INTEGER NOT NULL,
