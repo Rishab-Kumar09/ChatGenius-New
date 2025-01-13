@@ -7,11 +7,16 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add CORS headers for Replit deployment
+// Add CORS headers for multiple environments
 app.use((req, res, next) => {
-  const replit_domain = process.env.REPL_SLUG ? `.${process.env.REPL_OWNER}.repl.co` : undefined;
-  if (replit_domain) {
-    res.header('Access-Control-Allow-Origin', `https://${process.env.REPL_SLUG}${replit_domain}`);
+  const allowedOrigins = [
+    process.env.AWS_DOMAIN,
+    process.env.REPL_SLUG ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` : undefined
+  ].filter(Boolean);
+
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -79,10 +84,11 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // Use Replit's port and bind to all interfaces
+    // Configure for both AWS and Replit environments
     const PORT = parseInt(process.env.PORT || "5000", 10);
-    server.listen(PORT, "0.0.0.0", () => {
-      log(`Server running in ${app.get("env")} mode on port ${PORT}`);
+    const HOST = process.env.HOST || "0.0.0.0";
+    server.listen(PORT, HOST, () => {
+      log(`Server running in ${app.get("env")} mode on ${HOST}:${PORT}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
