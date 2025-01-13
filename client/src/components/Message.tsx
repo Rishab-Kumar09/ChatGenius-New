@@ -174,10 +174,10 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 hover:bg-red-500/10 focus:ring-0 flex items-center justify-center"
+              className="h-8 w-8 hover:bg-gray-100/10 focus:ring-0"
               onClick={handleDelete}
             >
-              <Trash2 className="h-5 w-5 text-red-500" />
+              <Trash2 className="h-5 w-5 text-red-400 hover:text-red-300" />
             </Button>
           </div>
         </div>
