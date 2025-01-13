@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useUser } from '../hooks/use-user';
 import { cn } from "../lib/utils";
 import { File as FileIcon, Download, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function Message({ message, isLastInGroup }: MessageProps) {
+  const { user } = useUser();
   const [showFullImage, setShowFullImage] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
@@ -168,25 +170,27 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             {formatTimestamp(message.timestamp)}
             {message.isEdited && " (edited)"}
           </span>
-          <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10">
-                  <MoreVertical className="h-4 w-4 text-gray-400 hover:text-white" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[140px]">
-                <DropdownMenuItem onClick={handleEdit}>
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {message.sender.id === parseInt(user?.id || '0', 10) && (
+            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10">
+                    <MoreVertical className="h-4 w-4 text-gray-400 hover:text-white" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[140px]">
+                  <DropdownMenuItem onClick={handleEdit}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
         
         <div>
