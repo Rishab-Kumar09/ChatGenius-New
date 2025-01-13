@@ -170,25 +170,24 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             {formatTimestamp(message.timestamp)}
             {message.isEdited && " (edited)"}
           </span>
-          <div className="ml-auto opacity-100 flex items-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10 focus:ring-0">
-                    <MoreVertical className="h-4 w-4 text-gray-200" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[140px]">
-                  <DropdownMenuItem onClick={handleEdit}>
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+          <div className="ml-auto opacity-100 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 hover:bg-gray-100/10 focus:ring-0"
+              onClick={handleEdit}
+            >
+              <Pencil className="h-4 w-4 text-gray-200" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 hover:bg-gray-100/10 focus:ring-0"
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-4 w-4 text-red-400" />
+            </Button>
+          </div>
         </div>
 
         <div>
