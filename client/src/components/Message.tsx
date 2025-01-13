@@ -111,7 +111,7 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             className="max-w-[300px] max-h-[300px] rounded-lg cursor-pointer object-contain hover:opacity-90"
             onClick={() => setShowFullImage(true)}
           />
-          
+
           <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
             <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-none">
               <DialogHeader className="absolute top-0 right-0 p-2 z-10">
@@ -136,7 +136,7 @@ export function Message({ message, isLastInGroup }: MessageProps) {
         </div>
       );
     }
-    
+
     return (
       <a
         href={message.fileUrl}
@@ -171,11 +171,11 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             {message.isEdited && " (edited)"}
           </span>
           {message.sender.id === parseInt(user?.id || '0', 10) && (
-            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10">
-                    <MoreVertical className="h-4 w-4 text-gray-400 hover:text-white" />
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100/10 focus:ring-0">
+                    <MoreVertical className="h-4 w-4 text-gray-200" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[140px]">
@@ -192,7 +192,7 @@ export function Message({ message, isLastInGroup }: MessageProps) {
             </div>
           )}
         </div>
-        
+
         <div>
           {message.content && isEditing ? (
             <div className="flex gap-2 items-center">
@@ -214,9 +214,9 @@ export function Message({ message, isLastInGroup }: MessageProps) {
           )}
           {message.fileUrl && renderFileContent()}
         </div>
-        
+
         <MessageReactions messageId={message.id.toString()} />
       </div>
     </div>
   );
-} 
+}
