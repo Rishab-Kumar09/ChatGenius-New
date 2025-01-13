@@ -84,12 +84,12 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // Configure for AWS deployment
-    const PORT = parseInt(process.env.PORT || "5000", 10);
-    const HOST = "0.0.0.0"; // Required for AWS
+    // Configure for AWS Elastic Beanstalk
+    const PORT = process.env.PORT || 8080;
+    const HOST = "0.0.0.0";
     server.listen(PORT, HOST, () => {
-      log(`Server running in ${app.get("env")} mode on ${HOST}:${PORT}`);
-      log(`Server is AWS-ready`);
+      log(`Server running in ${app.get("env")} mode on port ${PORT}`);
+      log(`Server is ready for AWS deployment`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
