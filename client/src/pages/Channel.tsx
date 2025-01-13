@@ -38,7 +38,7 @@ interface WebSocketMessage {
 
 export function Channel() {
   const [, params] = useRoute('/channel/:id');
-  const channelId = params?.id;
+  const channelId = params?.id ? parseInt(params.id, 10) : undefined;
   const { user } = useUser();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -51,8 +51,8 @@ export function Channel() {
 
   // Fetch channel details
   const { data: channel } = useQuery<ChannelWithMembers>({
-    queryKey: [`/api/channels/${channelId}`],
-    enabled: !!channelId,
+    queryKey: [`/api/channels/${channelId?.toString()}`],
+    enabled: !!channelId && !isNaN(channelId),
   });
 
   // Fetch channel membership status
@@ -61,13 +61,13 @@ export function Channel() {
     enabled: !!user,
   });
 
-  const currentChannel = channelId ? channels.find(c => c.id === parseInt(channelId, 10)) : undefined;
+  const currentChannel = channelId ? channels.find(c => c.id === channelId) : undefined;
   const isMember = currentChannel?.isMember;
 
   // Fetch messages
   const { data: messages = [], error: messagesError } = useQuery<Message[]>({
-    queryKey: [`/api/messages?channelId=${channelId}`],
-    enabled: !!channelId && !!isMember,
+    queryKey: [`/api/messages?channelId=${channelId?.toString()}`],
+    enabled: !!channelId && !isNaN(channelId) && !!isMember,
     refetchInterval: 3000
   });
 
@@ -81,7 +81,7 @@ export function Channel() {
       if (content.trim()) {
         formData.append('content', content);
       }
-      formData.append('channelId', channelId!);
+      formData.append('channelId', channelId!.toString());
       if (replyingTo?.id) {
         formData.append('parentId', replyingTo.id.toString());
       }
@@ -212,17 +212,17 @@ export function Channel() {
   // Listen for member count updates
   useEffect(() => {
     if (lastJsonMessage && lastJsonMessage.type === 'channel' && 
-        lastJsonMessage.data.channelId === parseInt(channelId!, 10) && 
+        lastJsonMessage.data.channelId === channelId && 
         (lastJsonMessage.data.action === 'member_joined' || lastJsonMessage.data.action === 'member_left')) {
       // Refetch channel details when membership changes
-      queryClient.invalidateQueries({ queryKey: [`/api/channels/${channelId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/channels/${channelId?.toString()}`] });
     }
   }, [lastJsonMessage, channelId, queryClient]);
 
   const handleInviteUser = async (userId: string | number) => {
     try {
       // Send the invitation
-      const response = await fetch(`/api/channels/${channelId}/invitations`, {
+      const response = await fetch(`/api/channels/${channelId?.toString()}/invitations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

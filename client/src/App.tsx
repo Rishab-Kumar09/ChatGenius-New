@@ -1,8 +1,9 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Router } from "wouter";
+import { useHashLocation } from "wouter/use-hash-location";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { MainLayout } from "@/layouts/MainLayout";
-import Channel from "@/pages/Channel"; // Changed to default import
+import MainLayout from "@/layouts/MainLayout";
+import Channel from "@/pages/Channel";
 import { DirectMessage } from "@/pages/DirectMessage";
 import { Home } from "@/pages/Home";
 import AuthPage from "@/pages/AuthPage";
@@ -27,19 +28,21 @@ function App() {
   }
 
   return (
-    <ToastProvider>
-      <MainLayout>
-        <Switch>
-          <Route path="/" component={Home} />
-          <Route path="/channel/:id" component={Channel} />
-          <Route path="/dm/:id" component={DirectMessage} />
-          <Route path="/profile" component={ProfilePage} />
-          <Route path="/profile/:id" component={UserProfile} />
-          <Route component={NotFound} />
-        </Switch>
-      </MainLayout>
-      <ToastViewport />
-    </ToastProvider>
+    <Router hook={useHashLocation}>
+      <ToastProvider>
+        <MainLayout>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/channel/:id" component={Channel} />
+            <Route path="/dm/:id" component={DirectMessage} />
+            <Route path="/profile" component={ProfilePage} />
+            <Route path="/profile/:id" component={UserProfile} />
+            <Route component={NotFound} />
+          </Switch>
+        </MainLayout>
+        <ToastViewport />
+      </ToastProvider>
+    </Router>
   );
 }
 

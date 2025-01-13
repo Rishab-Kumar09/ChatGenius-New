@@ -149,7 +149,7 @@ export function Sidebar({ className }: { className?: string }) {
         
         // If it's a deleted channel, handle navigation
         if (data.data.action === 'deleted') {
-          const currentPath = window.location.pathname;
+          const currentPath = window.location.hash.slice(1);
           if (currentPath === `/channel/${data.data.channelId}`) {
             navigate('/');
           }
@@ -260,7 +260,7 @@ export function Sidebar({ className }: { className?: string }) {
       });
 
       // Navigate to home if we're in the deleted channel
-      const currentPath = window.location.pathname;
+      const currentPath = window.location.hash.slice(1); // Get path from hash
       if (currentPath === `/channel/${channelId}`) {
         navigate('/');
       }

@@ -1,25 +1,32 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { LogOut, User } from "lucide-react";
+import { useLocation } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
-import { useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User } from "lucide-react";
 
-export function MainLayout({ children }: { children: ReactNode }) {
-  const { user, logout } = useUser();
-  const [, setLocation] = useLocation();
+export default function MainLayout({ children }: { children: ReactNode }) {
+  const { user, isLoading, logout } = useUser();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const currentPath = window.location.hash.slice(1);
+    if (!user && !isLoading && currentPath !== '/login') {
+      navigate('/login');
+    }
+  }, [user, isLoading, navigate]);
 
   const handleLogout = async () => {
     await logout();
-    setLocation('/');
+    navigate('/login');
   };
 
   return (
@@ -37,7 +44,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setLocation('/profile')}>
+              <DropdownMenuItem onClick={() => navigate('/profile')}>
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>

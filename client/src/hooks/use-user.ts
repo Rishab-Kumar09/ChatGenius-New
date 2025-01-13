@@ -24,13 +24,25 @@ async function fetchUser(): Promise<SelectUser | null> {
 
 export function useUser() {
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
+  const [location, navigate] = useLocation();
 
-  const { data: user, isLoading } = useQuery<SelectUser | null>({
-    queryKey: ['/api/user'],
-    queryFn: fetchUser,
-    retry: false,
-    staleTime: 0, // Set to 0 to always fetch fresh data when component mounts
+  const { data: user, isLoading, error } = useQuery<SelectUser | null>({
+    queryKey: ['/api/users/me'],
+    queryFn: async () => {
+      const res = await fetch('/api/users/me');
+      if (!res.ok) {
+        if (res.status === 401) {
+          // Check if we're not already on the login page to avoid infinite redirects
+          const currentPath = window.location.hash.slice(1);
+          if (currentPath !== '/login') {
+            navigate('/login');
+          }
+          throw new Error('Not authenticated');
+        }
+        throw new Error('Failed to fetch user');
+      }
+      return res.json();
+    },
   });
 
   const authMutation = useMutation({
@@ -51,7 +63,7 @@ export function useUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      setLocation('/'); // Redirect to home after successful auth
+      navigate('/'); // Redirect to home after successful auth
       window.location.reload(); // Refresh the page after login
     },
   });
@@ -69,13 +81,14 @@ export function useUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      setLocation('/'); // Redirect to home after logout
+      navigate('/'); // Redirect to home after logout
     },
   });
 
   return {
     user,
     isLoading,
+    error,
     login: (username: string, password: string) => 
       authMutation.mutate({ username, password, isLogin: true }),
     register: (username: string, password: string) =>

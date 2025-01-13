@@ -1,14 +1,15 @@
 # Dependencies
-/node_modules
-/.pnp
+node_modules/
+.pnp
 .pnp.js
 
 # Testing
-/coverage
+coverage/
 
 # Production
-/build
-/dist
+build/
+dist/
+out/
 
 # Misc
 .DS_Store
@@ -17,8 +18,9 @@
 .env.development.local
 .env.test.local
 .env.production.local
+*.pem
 
-# Debug logs
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -26,13 +28,15 @@ yarn-error.log*
 # IDE
 .idea/
 .vscode/
-
-# Uploads directory
-/uploads
-/uploads/*
-/client/public/uploads
-/client/public/uploads/*
+*.swp
+*.swo
 
 # Database
 *.db
-*.db-journal
+*.db-shm
+*.db-wal
+
+# Uploads
+uploads/
+uploads/*
+!uploads/.gitkeep
