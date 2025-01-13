@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Hash, Plus, Trash2, Circle, Lock, Bell, LogOut } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { StatusSelector } from "./StatusSelector";
 import { SearchBar } from "./SearchBar";
@@ -367,9 +367,11 @@ export function Sidebar({ className }: { className?: string }) {
     <div className={cn("flex flex-col h-full bg-[#1a1f36] text-white min-w-[280px]", className)}>
       {/* Search and Title section */}
       <div className="p-4">
-        <h2 className="text-3xl font-extrabold mb-4 bg-gradient-to-b from-blue-300 to-blue-500 bg-clip-text text-transparent">
-          Chat Genius
-        </h2>
+        <Link href="/" className="block w-fit">
+          <h2 className="text-3xl font-extrabold mb-4 bg-gradient-to-b from-blue-300 to-blue-500 bg-clip-text text-transparent hover:from-blue-200 hover:to-blue-400 transition-colors">
+            Chat Genius
+          </h2>
+        </Link>
         <div className="relative">
           <SearchBar onSearch={setQuery} />
           {query && (
