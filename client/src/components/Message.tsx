@@ -215,7 +215,31 @@ export function Message({ message, isLastInGroup }: MessageProps) {
           {message.fileUrl && renderFileContent()}
         </div>
 
-        <MessageReactions messageId={message.id.toString()} />
+        <div className="flex items-center gap-2 mt-1">
+          <MessageReactions messageId={message.id.toString()} />
+          {message.sender.id === user?.id && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={handleEdit}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Delete
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
