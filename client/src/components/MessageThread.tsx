@@ -375,31 +375,57 @@ export function MessageThread({
                       className="max-h-[200px] w-auto rounded-lg border cursor-pointer hover:brightness-90 transition-all"
                       onClick={() => setExpandedImage(message.fileUrl || null)}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute bottom-2 right-2 h-8 w-8 bg-background/50 backdrop-blur-sm opacity-0 group-hover/image:opacity-100 transition-opacity"
-                      onClick={() => setExpandedImage(message.fileUrl || null)}
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </Button>
+                    <div className="absolute bottom-2 right-2 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 bg-background/50 backdrop-blur-sm opacity-0 group-hover/image:opacity-100 transition-opacity"
+                        onClick={() => setExpandedImage(message.fileUrl || null)}
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                      {message.sender.id.toString() === currentUserId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 bg-background/50 backdrop-blur-sm opacity-0 group-hover/image:opacity-100 transition-opacity hover:text-destructive"
+                          onClick={() => setMessageToDelete(message.id.toString())}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <a 
-                    href={message.fileUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                    <span>{message.fileName}</span>
-                    {message.fileSize && (
-                      <span className="text-muted-foreground">
-                        ({Math.round(message.fileSize / 1024)}KB)
-                      </span>
+                  <div className="flex items-center gap-2">
+                    <a 
+                      href={message.fileUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                      <span>{message.fileName}</span>
+                      {message.fileSize && (
+                        <span className="text-muted-foreground">
+                          ({Math.round(message.fileSize / 1024)}KB)
+                        </span>
+                      )}
+                    </a>
+                    {message.sender.id.toString() === currentUserId && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:text-destructive"
+                        onClick={() => setMessageToDelete(message.id.toString())}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
-                  </a>
+                  </div>
                 )}
               </div>
             )}
