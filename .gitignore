@@ -1,14 +1,14 @@
 # Dependencies
-node_modules/
-.pnp
+/node_modules
+/.pnp
 .pnp.js
 
 # Testing
-coverage/
+/coverage
 
 # Production
-dist/
-build/
+/build
+/dist
 
 # Misc
 .DS_Store
@@ -17,23 +17,18 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
-*.pem
 
-# Debug
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Database
-*.db
-*.db-journal
-
 # IDE
 .idea/
 .vscode/
-*.swp
-*.swo
 
-# Logs
-logs
-*.log
+# Uploads directory
+/uploads
+/uploads/*
+/client/public/uploads
+/client/public/uploads/*

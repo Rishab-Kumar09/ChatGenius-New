@@ -25,6 +25,7 @@ export interface Channel {
   role?: 'owner' | 'member' | null;
   isMember?: boolean;
   isPendingInvitation?: boolean;
+  memberCount: number;
 }
 
 export interface DirectMessage {

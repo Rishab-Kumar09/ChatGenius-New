@@ -6,10 +6,10 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useUser } from "@/hooks/use-user";
 import { useEffect, useRef, useState } from "react";
 import { MessageThread } from "@/components/MessageThread";
-import type { Message, Channel as ChannelType } from "@/lib/types";
+import type { Message, Channel as ChannelType, User } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Lock, Crown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useSearch } from "@/hooks/useSearch";
@@ -19,6 +19,22 @@ import { useWebSocket } from "../hooks/use-websocket";
 interface ChannelWithStatus extends ChannelType {
   isMember: boolean;
   isPendingInvitation: boolean;
+}
+
+interface ChannelWithMembers extends ChannelType {
+  members: Array<User & { role: string }>;
+  isMember: boolean;
+  isPendingInvitation: boolean;
+}
+
+interface WebSocketMessage {
+  type: string;
+  data: {
+    action: string;
+    channelId: number;
+    userId: number;
+    memberCount?: number;
+  };
 }
 
 export function Channel() {
@@ -31,10 +47,11 @@ export function Channel() {
   const { query: inviteQuery, setQuery: setInviteQuery, results: searchResults } = useSearch();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { sendMessage, isConnected } = useWebSocket();
+  const { sendMessage, isConnected, lastJsonMessage } = useWebSocket();
+  const [isMemberListOpen, setIsMemberListOpen] = useState(false);
 
   // Fetch channel details
-  const { data: channel } = useQuery<ChannelType>({
+  const { data: channel } = useQuery<ChannelWithMembers>({
     queryKey: [`/api/channels/${channelId}`],
     enabled: !!channelId,
   });
@@ -55,28 +72,34 @@ export function Channel() {
     refetchInterval: 3000
   });
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, file?: File) => {
     try {
       if (!isMember) {
         throw new Error('You must be a member of this channel to send messages');
       }
 
-      console.log('Sending message:', { content, channelId, parentId: replyingTo?.id });
+      const formData = new FormData();
+      if (content.trim()) {
+        formData.append('content', content);
+      }
+      formData.append('channelId', channelId!);
+      if (replyingTo?.id) {
+        formData.append('parentId', replyingTo.id.toString());
+      }
+      if (file) {
+        formData.append('file', file);
+        console.log('Appending file:', file.name, file.type, file.size);
+      }
+
       const response = await fetch('/api/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content,
-          channelId: parseInt(channelId!, 10),
-          parentId: replyingTo?.id ? parseInt(replyingTo.id, 10) : null
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to send message');
+        const error = await response.text();
+        console.error('Failed to send message:', error);
+        throw new Error('Failed to send message');
       }
 
       // Clear reply state after successful send
@@ -170,6 +193,8 @@ export function Channel() {
 
       // Refetch channels to update membership status
       await queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+      // Also refetch channel details to update member count
+      await queryClient.invalidateQueries({ queryKey: [`/api/channels/${channelId}`] });
 
       toast({
         title: "Success",
@@ -184,6 +209,16 @@ export function Channel() {
       });
     }
   };
+
+  // Listen for member count updates
+  useEffect(() => {
+    if (lastJsonMessage && lastJsonMessage.type === 'channel' && 
+        lastJsonMessage.data.channelId === parseInt(channelId!, 10) && 
+        (lastJsonMessage.data.action === 'member_joined' || lastJsonMessage.data.action === 'member_left')) {
+      // Refetch channel details when membership changes
+      queryClient.invalidateQueries({ queryKey: [`/api/channels/${channelId}`] });
+    }
+  }, [lastJsonMessage, channelId, queryClient]);
 
   const handleInviteUser = async (userId: string | number) => {
     try {
@@ -233,9 +268,55 @@ export function Channel() {
       <div className="border-b p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">#{channel.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold">#{channel.name}</h1>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <span>•</span>
+                <Dialog open={isMemberListOpen} onOpenChange={setIsMemberListOpen}>
+                  <DialogTrigger asChild>
+                    <button className="hover:underline">
+                      {channel.memberCount || 0} members
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Members • {channel.name}</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-[400px] mt-4">
+                      <div className="space-y-4">
+                        {channel.members?.map((member) => (
+                          <div key={member.id} className="flex items-center gap-3">
+                            <UserAvatar user={member} className="h-8 w-8" />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">
+                                  {member.displayName || member.username}
+                                </span>
+                                {member.role === 'owner' && (
+                                  <Crown className="h-4 w-4 text-yellow-500" />
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                @{member.username}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+                {channel.isPrivate && (
+                  <>
+                    <span>•</span>
+                    <Lock className="h-3.5 w-3.5" />
+                    <span>Private</span>
+                  </>
+                )}
+              </div>
+            </div>
             {channel.description && (
-              <p className="text-sm text-muted-foreground">{channel.description}</p>
+              <p className="text-sm text-muted-foreground mt-1">{channel.description}</p>
             )}
           </div>
           <div className="flex gap-2">
@@ -282,27 +363,35 @@ export function Channel() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 relative">
         {!isMember ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             Join this channel to view messages
           </div>
         ) : (
           <>
-            <MessageThread 
-              messages={messages}
-              currentUserId={user?.id.toString() || ''}
-              onReply={handleReply}
-              replyingTo={replyingTo}
-              onReaction={handleReaction}
-            />
+            <div className="absolute inset-0 overflow-y-auto">
+              <div className="min-h-full">
+                <div className="p-4 pb-[76px]">
+                  <MessageThread 
+                    messages={messages}
+                    currentUserId={user?.id.toString() || ''}
+                    onReply={handleReply}
+                    replyingTo={replyingTo}
+                    onReaction={handleReaction}
+                  />
+                </div>
+              </div>
+            </div>
 
-            <MessageInput 
-              onSend={handleSendMessage} 
-              disabled={!user || !isMember}
-              replyingTo={replyingTo}
-              onCancelReply={() => setReplyingTo(null)}
-            />
+            <div className="absolute bottom-0 left-0 right-0 bg-background">
+              <MessageInput 
+                onSend={handleSendMessage} 
+                disabled={!user || !isMember}
+                replyingTo={replyingTo}
+                onCancelReply={() => setReplyingTo(null)}
+              />
+            </div>
           </>
         )}
       </div>

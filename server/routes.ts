@@ -286,11 +286,20 @@ export function registerRoutes(app: Express): Server {
 
   // Configure multer for handling file uploads
   const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      const uploadPath = path.join(process.cwd(), 'uploads');
+    destination: (req, file, cb) => {
+      // Determine the upload path based on file type
+      let uploadPath = path.join(process.cwd(), 'uploads');
+      
+      // If it's an avatar upload, use the avatars subdirectory
+      if (file.fieldname === 'avatar') {
+        uploadPath = path.join(process.cwd(), 'uploads', 'avatars');
+      }
+      
+      // Create directory if it doesn't exist
       if (!fs.existsSync(uploadPath)) {
         fs.mkdirSync(uploadPath, { recursive: true });
       }
+      
       cb(null, uploadPath);
     },
     filename: (_req, file, cb) => {
@@ -646,6 +655,18 @@ export function registerRoutes(app: Express): Server {
         );
       console.log('Found channels:', allChannels);
 
+      // Get member count for each channel
+      const memberCounts = await Promise.all(
+        allChannels.map(async (channel) => {
+          const [{ count }] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(channelMembers)
+            .where(eq(channelMembers.channelId, channel.id));
+          return { channelId: channel.id, count };
+        })
+      );
+      const memberCountMap = new Map(memberCounts.map(m => [m.channelId, m.count]));
+
       // Create maps for membership status and role
       const membershipMap = new Map(memberships.map(m => [m.channelId, { isMember: true, role: m.role }]));
       const invitationMap = new Map(invitations.map(i => [i.channelId, true]));
@@ -655,7 +676,8 @@ export function registerRoutes(app: Express): Server {
         ...channel,
         isMember: membershipMap.has(channel.id),
         role: membershipMap.get(channel.id)?.role || null,
-        isPendingInvitation: invitationMap.has(channel.id)
+        isPendingInvitation: invitationMap.has(channel.id),
+        memberCount: memberCountMap.get(channel.id) || 0
       }));
 
       console.log('Returning channels with status:', channelsWithStatus);
@@ -1334,7 +1356,7 @@ export function registerRoutes(app: Express): Server {
       const channelId = parseInt(req.params.channelId);
       const userId = req.user!.id;
 
-      // Check if channel exists
+      // Check if channel exists and is public
       const [channel] = await db
         .select()
         .from(channels)
@@ -1345,7 +1367,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Channel not found" });
       }
 
-      // Check if user is already a member
+      if (channel.isPrivate) {
+        return res.status(403).json({ error: "Cannot join private channel without invitation" });
+      }
+
+      // Check if already a member
       const [existingMember] = await db
         .select()
         .from(channelMembers)
@@ -1358,32 +1384,7 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (existingMember) {
-        return res.status(400).json({ error: "You are already a member of this channel" });
-      }
-
-      // For private channels, require an invitation
-      if (channel.isPrivate) {
-        const [invitation] = await db
-          .select()
-          .from(channelInvitations)
-          .where(
-            and(
-              eq(channelInvitations.channelId, channelId),
-              eq(channelInvitations.inviteeId, userId),
-              eq(channelInvitations.status, 'pending')
-            )
-          )
-          .limit(1);
-
-        if (!invitation) {
-          return res.status(403).json({ error: "You need an invitation to join this private channel" });
-        }
-
-        // Update invitation status to accepted
-        await db
-          .update(channelInvitations)
-          .set({ status: 'accepted' })
-          .where(eq(channelInvitations.id, invitation.id));
+        return res.status(400).json({ error: "Already a member of this channel" });
       }
 
       // Add user as channel member
@@ -1393,17 +1394,24 @@ export function registerRoutes(app: Express): Server {
         role: 'member'
       });
 
-      // Broadcast channel join event
+      // Get updated member count
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(channelMembers)
+        .where(eq(channelMembers.channelId, channelId));
+
+      // Broadcast channel join event with updated count
       broadcastEvent({
         type: 'channel',
         data: {
           action: 'member_joined',
           channelId,
-          userId
+          userId,
+          memberCount: count
         }
       });
 
-      res.json({ message: "Successfully joined channel" });
+      res.json({ message: "Joined channel successfully", memberCount: count });
     } catch (error) {
       console.error('Failed to join channel:', error);
       res.status(500).json({ error: "Failed to join channel" });
@@ -1414,7 +1422,7 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/channels/:channelId/invitations", requireAuth, async (req: Request, res: Response) => {
     try {
       const channelId = parseInt(req.params.channelId);
-      const { userId } = req.body;
+      const { inviteeId } = req.body;
       const inviterId = req.user!.id;
 
       // Check if channel exists
@@ -1451,7 +1459,7 @@ export function registerRoutes(app: Express): Server {
         .where(
           and(
             eq(channelMembers.channelId, channelId),
-            eq(channelMembers.userId, userId)
+            eq(channelMembers.userId, inviteeId)
           )
         )
         .limit(1);
@@ -1467,7 +1475,7 @@ export function registerRoutes(app: Express): Server {
         .where(
           and(
             eq(channelInvitations.channelId, channelId),
-            eq(channelInvitations.inviteeId, userId),
+            eq(channelInvitations.inviteeId, inviteeId),
             eq(channelInvitations.status, 'pending')
           )
         )
@@ -1483,7 +1491,7 @@ export function registerRoutes(app: Express): Server {
         .values({
           channelId,
           inviterId,
-          inviteeId: userId,
+          inviteeId: inviteeId,
           status: 'pending'
         })
         .returning();
@@ -1564,13 +1572,20 @@ export function registerRoutes(app: Express): Server {
           role: 'member'
         });
 
-        // Broadcast channel join event
+        // Get updated member count
+        const [{ count }] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(channelMembers)
+          .where(eq(channelMembers.channelId, parseInt(channelId)));
+
+        // Broadcast channel join event with updated count
         broadcastEvent({
           type: 'channel',
           data: {
             action: 'member_joined',
             channelId: parseInt(channelId),
-            userId
+            userId,
+            memberCount: count
           }
         });
       }
@@ -1579,6 +1594,119 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error(`Failed to ${req.body.action} invitation:`, error);
       res.status(500).json({ error: `Failed to ${req.body.action} invitation` });
+    }
+  });
+
+  // Get channel details
+  app.get("/api/channels/:channelId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const channelId = parseInt(req.params.channelId);
+
+      // Get channel details
+      const [channel] = await db
+        .select()
+        .from(channels)
+        .where(eq(channels.id, channelId))
+        .limit(1);
+
+      if (!channel) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+
+      // Get members with their details
+      const members = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          role: channelMembers.role
+        })
+        .from(channelMembers)
+        .where(eq(channelMembers.channelId, channelId))
+        .innerJoin(users, eq(users.id, channelMembers.userId));
+
+      // Return channel with member details
+      res.json({
+        ...channel,
+        memberCount: members.length,
+        members: members
+      });
+    } catch (error) {
+      console.error('Error fetching channel:', error);
+      res.status(500).json({ error: "Failed to fetch channel details" });
+    }
+  });
+
+  // Leave channel endpoint
+  app.post("/api/channels/:channelId/leave", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const channelId = parseInt(req.params.channelId);
+      const userId = req.user!.id;
+
+      // Check if channel exists
+      const [channel] = await db
+        .select()
+        .from(channels)
+        .where(eq(channels.id, channelId))
+        .limit(1);
+
+      if (!channel) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+
+      // Check if user is a member
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.channelId, channelId),
+            eq(channelMembers.userId, userId)
+          )
+        )
+        .limit(1);
+
+      if (!membership) {
+        return res.status(400).json({ error: "Not a member of this channel" });
+      }
+
+      // Check if user is not the owner
+      if (membership.role === 'owner') {
+        return res.status(400).json({ error: "Channel owner cannot leave. Delete the channel instead." });
+      }
+
+      // Remove user from channel members
+      await db
+        .delete(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.channelId, channelId),
+            eq(channelMembers.userId, userId)
+          )
+        );
+
+      // Get updated member count
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(channelMembers)
+        .where(eq(channelMembers.channelId, channelId));
+
+      // Broadcast member left event
+      broadcastEvent({
+        type: 'channel',
+        data: {
+          action: 'member_left',
+          channelId,
+          userId,
+          memberCount: count
+        }
+      });
+
+      res.json({ message: "Left channel successfully" });
+    } catch (error) {
+      console.error('Failed to leave channel:', error);
+      res.status(500).json({ error: "Failed to leave channel" });
     }
   });
 

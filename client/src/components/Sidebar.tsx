@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Hash, Plus, Trash2, Circle, Lock, Bell } from "lucide-react";
+import { Hash, Plus, Trash2, Circle, Lock, Bell, LogOut } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
@@ -94,6 +94,7 @@ export function Sidebar({ className }: { className?: string }) {
   const [currentStatus, setCurrentStatus] = useState<'online' | 'busy' | 'offline'>('online');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [channelToDelete, setChannelToDelete] = useState<number | null>(null);
+  const [channelToLeave, setChannelToLeave] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { query, setQuery, results, isLoading } = useSearch();
@@ -331,10 +332,39 @@ export function Sidebar({ className }: { className?: string }) {
     }
   };
 
+  const handleLeaveChannel = async (channelId: number) => {
+    try {
+      const response = await fetch(`/api/channels/${channelId}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to leave channel');
+      }
+
+      // Refetch channels
+      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+      setChannelToLeave(null);
+
+      toast({
+        title: "Left Channel",
+        description: "You have successfully left the channel."
+      });
+    } catch (error) {
+      console.error('Error leaving channel:', error);
+      toast({
+        title: "Error",
+        description: "Failed to leave channel. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (!currentUser) return null;
 
   return (
-    <div className={cn("flex flex-col h-full bg-[#1a1f36] text-white", className)}>
+    <div className={cn("flex flex-col h-full bg-[#1a1f36] text-white min-w-[280px]", className)}>
       {/* Search and Title section */}
       <div className="p-4">
         <h2 className="text-3xl font-extrabold mb-4 bg-gradient-to-b from-blue-300 to-blue-500 bg-clip-text text-transparent">
@@ -359,9 +389,13 @@ export function Sidebar({ className }: { className?: string }) {
 
       <Separator className="bg-white/10" />
 
-      <div className="flex-1 overflow-y-auto">
+      {/* Scrollable content */}
+      <div className="flex-1 px-4 overflow-x-hidden overflow-y-hidden hover:overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-blue-300/40 scrollbar-thin scrollbar-thumb-blue-300/40 scrollbar-track-transparent" style={{ 
+        scrollbarGutter: 'stable',
+        scrollbarColor: 'rgba(147, 197, 253, 0.4) transparent'
+      } as React.CSSProperties}>
         {/* Channels section */}
-        <div className="p-4">
+        <div className="py-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold text-white/90">Channels</h2>
             <Button size="icon" variant="ghost" onClick={() => setIsDialogOpen(true)}>
@@ -375,13 +409,13 @@ export function Sidebar({ className }: { className?: string }) {
                 className="flex-1 justify-start mb-1 hover:bg-white/10 text-white/80 hover:text-white"
                 onClick={() => navigate(`/channel/${channel.id}`)}
               >
-                <Hash className="h-4 w-4 mr-2 opacity-70" />
-                <span className="truncate">{channel.name}</span>
+                <Hash className="h-4 w-4 mr-2 opacity-70 flex-shrink-0" />
+                <span className="truncate max-w-[140px]">{channel.name}</span>
                 {channel.isPrivate && (
-                  <Lock className="h-3.5 w-3.5 text-yellow-500/70 ml-2" />
+                  <Lock className="h-3.5 w-3.5 text-yellow-500/70 ml-2 flex-shrink-0" />
                 )}
               </Button>
-              {channel.role === 'owner' && (
+              {channel.role === 'owner' ? (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -390,18 +424,25 @@ export function Sidebar({ className }: { className?: string }) {
                 >
                   <Trash2 className="h-4 w-4 text-red-400" />
                 </Button>
+              ) : channel.role === 'member' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 hover:bg-white/10"
+                  onClick={() => setChannelToLeave(channel.id)}
+                >
+                  <LogOut className="h-4 w-4 text-red-400" />
+                </Button>
               )}
             </div>
           ))}
         </div>
 
-        <Separator className="bg-white/10" />
+        <Separator className="bg-white/10 my-2" />
 
         {/* Direct Messages section */}
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold text-white/90">Direct Messages</h2>
-          </div>
+        <div className="py-4">
+          <h2 className="text-lg font-semibold text-white/90 mb-2">Direct Messages</h2>
           {conversations.map((conversation) => {
             const userStatus = presenceUpdates.get(conversation.userId.toString())?.status || 'offline';
             return (
@@ -443,10 +484,8 @@ export function Sidebar({ className }: { className?: string }) {
           })}
         </div>
 
-        <Separator className="bg-white/10" />
-
         {/* Invitations section */}
-        <div className="p-4">
+        <div className="py-4">
           <h2 className="text-lg font-semibold text-white/90 mb-2">Invitations</h2>
           {pendingInvitations.length > 0 ? (
             <div className="space-y-2">
@@ -485,8 +524,8 @@ export function Sidebar({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* User status section - Now outside the scrollable area */}
-      <div className="p-4 bg-[#151930] mt-auto">
+      {/* User status section - Fixed at bottom */}
+      <div className="sticky bottom-0 p-4 bg-[#151930] border-t border-white/10">
         <div className="flex items-center gap-2">
           <UserAvatar
             user={currentUser}
@@ -527,6 +566,65 @@ export function Sidebar({ className }: { className?: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Leave Channel Confirmation Dialog */}
+      <AlertDialog open={channelToLeave !== null} onOpenChange={(open) => !open && setChannelToLeave(null)}>
+        <AlertDialogContent className="bg-[#1a1f36] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Leave Channel</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              Are you sure you want to leave this channel? You'll need a new invitation to rejoin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setChannelToLeave(null)} className="bg-transparent text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => channelToLeave && handleLeaveChannel(channelToLeave)}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Channel Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="bg-[#1a1f36] border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Create Channel</DialogTitle>
+            <DialogDescription className="text-white/70">
+              Create a new channel to start chatting with others.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateChannel} className="space-y-4">
+            <div>
+              <Label htmlFor="channelName" className="text-white">Channel Name</Label>
+              <Input
+                id="channelName"
+                placeholder="e.g. general"
+                {...form.register("channelName")}
+                className="bg-transparent border-white/10 text-white"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="isPublic" className="text-white">Public Channel</Label>
+              <Switch
+                id="isPublic"
+                checked={form.watch("isPublic")}
+                onCheckedChange={(checked) => form.setValue("isPublic", checked)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" className="w-full">
+                Create Channel
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

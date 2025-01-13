@@ -183,44 +183,43 @@ export function DirectMessage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex flex-col px-6 py-3 border-b">
-        <div className="flex items-center gap-2">
-          <UserAvatar user={recipientUser} className="h-8 w-8" interactive />
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h1 className="font-semibold">{recipientUser.displayName || recipientUser.username}</h1>
-              <Circle 
-                className={cn(
-                  "h-3 w-3",
-                  userStatus === 'online' && "fill-green-500 text-green-500",
-                  userStatus === 'busy' && "fill-yellow-500 text-yellow-500",
-                  userStatus === 'offline' && "fill-red-500 text-red-500"
-                )} 
-              />
-              <span className="text-sm text-muted-foreground capitalize">{userStatus}</span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {recipientUser.aboutMe || 'No status set'}
-            </p>
+      <div className="border-b p-4">
+        <div className="flex items-center gap-3">
+          <UserAvatar user={recipientUser} className="h-10 w-10" interactive />
+          <div>
+            <h1 className="text-xl font-semibold">
+              {recipientUser?.displayName || recipientUser?.username || 'Loading...'}
+            </h1>
+            {recipientUser?.status && (
+              <p className="text-sm text-muted-foreground">{recipientUser.status}</p>
+            )}
           </div>
         </div>
       </div>
-      <ScrollArea className="flex-1 px-6">
-        <MessageThread 
-          messages={allMessages} 
-          currentUserId={currentUser?.id?.toString() || ''} 
-          onReaction={handleReaction}
-          onReply={handleReply}
-          replyingTo={replyingTo}
-        />
-      </ScrollArea>
-      <div className="p-4 border-t">
-        <MessageInput 
-          onSend={handleSendMessage} 
-          disabled={!currentUser}
-          replyingTo={replyingTo}
-          onCancelReply={() => setReplyingTo(null)}
-        />
+
+      <div className="flex-1 relative">
+        <div className="absolute inset-0 overflow-y-auto">
+          <div className="min-h-full">
+            <div className="p-4 pb-[76px]">
+              <MessageThread 
+                messages={allMessages}
+                currentUserId={currentUser?.id.toString() || ''}
+                onReply={handleReply}
+                replyingTo={replyingTo}
+                onReaction={handleReaction}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 bg-background">
+          <MessageInput 
+            onSend={handleSendMessage}
+            disabled={!currentUser}
+            replyingTo={replyingTo}
+            onCancelReply={() => setReplyingTo(null)}
+          />
+        </div>
       </div>
     </div>
   );

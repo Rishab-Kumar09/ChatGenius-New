@@ -101,7 +101,7 @@ export function SearchResults({
         <div className="p-2">
           <h3 className="text-sm font-medium mb-2 px-2">Channels</h3>
           {channels.map(channel => {
-            const isMember = channel.members?.some(member => member.id === currentUser?.id);
+            const isMember = channel.isMember;
 
             return (
               <Button

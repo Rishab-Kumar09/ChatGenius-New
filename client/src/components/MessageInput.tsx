@@ -1,17 +1,21 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { SendHorizontal, Paperclip, X, Reply, Smile } from "lucide-react";
+import { SendHorizontal, Paperclip, X, Reply, Smile, Image, File, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Message } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 
 const COMMON_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🙏",
   "✨", "🔥", "💯", "⭐", "💪", "👀", "🤔", "👏"
 ];
 
 interface MessageInputProps {
-  onSend: (content: string, file?: File) => void;
+  onSend: (content: string, file?: File) => Promise<void>;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -29,14 +33,69 @@ export function MessageInput({
 }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileQueue, setFileQueue] = useState<File[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Create preview URLs for files
+  useEffect(() => {
+    const files = [selectedFile, ...fileQueue].filter((f): f is File => f !== null);
+    const urls = files.map(file => URL.createObjectURL(file));
+    setPreviewUrls(urls);
+
+    return () => {
+      // Cleanup URLs when component unmounts or files change
+      urls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [selectedFile, fileQueue]);
+
+  const processFileQueue = async () => {
+    if (isSending || fileQueue.length === 0) return;
+    
+    setIsSending(true);
+    const nextFile = fileQueue[0];
+    
+    try {
+      await onSend("", nextFile);
+      setFileQueue(prev => {
+        const remaining = prev.slice(1);
+        if (remaining.length > 0) {
+          processFileQueue();
+        }
+        return remaining;
+      });
+    } catch (error) {
+      console.error('Failed to send file:', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((content.trim() || selectedFile) && !disabled) {
-      onSend(content, selectedFile || undefined);
-      setContent("");
-      setSelectedFile(null);
+    if ((content.trim() || selectedFile || fileQueue.length > 0) && !disabled) {
+      try {
+        // Send first file with content
+        if (selectedFile) {
+          await onSend(content, selectedFile);
+        } else if (content.trim()) {
+          await onSend(content);
+        }
+
+        // Send remaining files
+        for (const file of fileQueue) {
+          await onSend("", file);
+        }
+
+        // Clear all states
+        setContent("");
+        setSelectedFile(null);
+        setFileQueue([]);
+      } catch (error) {
+        console.error('Failed to send message:', error);
+      }
     }
   };
 
@@ -48,10 +107,76 @@ export function MessageInput({
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Add all files to the queue
+    if (!selectedFile) {
+      setSelectedFile(files[0]);
+      setFileQueue(files.slice(1));
+    } else {
+      setFileQueue(prev => [...prev, ...files]);
     }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    if (index === 0) {
+      setSelectedFile(fileQueue[0] || null);
+      setFileQueue(prev => prev.slice(1));
+    } else {
+      setFileQueue(prev => prev.filter((_, i) => i !== index - 1));
+    }
+  };
+
+  const renderFilePreview = (file: File, url: string, index: number) => {
+    const isImage = file.type.startsWith('image/');
+
+    return (
+      <div key={url} className="relative group">
+        <div className="relative aspect-square w-20 rounded-md overflow-hidden border bg-muted/50">
+          {isImage ? (
+            <img
+              src={url}
+              alt={file.name}
+              className="h-full w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setSelectedPreview(url)}
+            />
+          ) : (
+            <div className="h-full w-full flex flex-col items-center justify-center p-2 gap-1">
+              <File className="h-8 w-8 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground truncate max-w-full">
+                {file.name}
+              </span>
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute top-0.5 right-0.5 h-5 w-5 bg-background/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => removeFile(index)}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+          {isImage && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute bottom-0.5 right-0.5 h-5 w-5 bg-background/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => setSelectedPreview(url)}
+            >
+              <Maximize2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const insertEmoji = (emoji: string) => {
@@ -59,7 +184,13 @@ export function MessageInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-2 p-4", className)}>
+    <form 
+      onSubmit={handleSubmit} 
+      className={cn(
+        "z-10 flex flex-col gap-2 p-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75",
+        className
+      )}
+    >
       {replyingTo && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
           <Reply className="h-4 w-4" />
@@ -75,19 +206,31 @@ export function MessageInput({
           </Button>
         </div>
       )}
-      {selectedFile && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
-          <Paperclip className="h-4 w-4" />
-          <span>{selectedFile.name}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 ml-auto"
-            onClick={() => setSelectedFile(null)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+      {(selectedFile || fileQueue.length > 0) && (
+        <div className="bg-muted/50 p-2 rounded-md">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Paperclip className="h-4 w-4" />
+              <span>{previewUrls.length} {previewUrls.length === 1 ? 'file' : 'files'} selected</span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => {
+                setSelectedFile(null);
+                setFileQueue([]);
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {[selectedFile, ...fileQueue].map((file, index) => 
+              file && renderFilePreview(file, previewUrls[index], index)
+            )}
+          </div>
         </div>
       )}
       <div className="flex items-end gap-2">
@@ -96,56 +239,79 @@ export function MessageInput({
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="min-h-[44px] w-full resize-none"
+          className="min-h-[44px] w-full resize-none bg-muted/50 focus-visible:bg-background"
           rows={1}
           disabled={disabled}
         />
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              disabled={disabled}
-            >
-              <Smile className="h-5 w-5" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2" sideOffset={5}>
-            <div className="flex gap-1 flex-wrap max-w-[200px]">
-              {COMMON_EMOJIS.map((emoji) => (
-                <Button
-                  key={emoji}
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hover:scale-110 hover:bg-primary/10"
-                  onClick={() => insertEmoji(emoji)}
-                >
-                  {emoji}
-                </Button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled}
-        >
-          <Paperclip className="h-5 w-5" />
-        </Button>
-        <Button type="submit" size="icon" disabled={disabled || (!content.trim() && !selectedFile)}>
-          <SendHorizontal className="h-5 w-5" />
-        </Button>
+        <div className="flex gap-1">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={disabled}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Smile className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-2" sideOffset={5}>
+              <div className="flex gap-1 flex-wrap max-w-[200px]">
+                {COMMON_EMOJIS.map((emoji) => (
+                  <Button
+                    key={emoji}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:scale-110 hover:bg-primary/10"
+                    onClick={() => insertEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <input
+            type="file"
+            multiple
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept="image/*,application/pdf,.doc,.docx,.txt"
+            className="hidden"
+          />
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
+          <Button 
+            type="submit" 
+            size="icon" 
+            disabled={disabled || (!content.trim() && !selectedFile)}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <SendHorizontal className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={!!selectedPreview} onOpenChange={() => setSelectedPreview(null)}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-0">
+          {selectedPreview && (
+            <img
+              src={selectedPreview}
+              alt="Preview"
+              className="w-full h-full object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
