@@ -61,10 +61,10 @@ export function MessageInput({
 
   const processFileQueue = async () => {
     if (isSending || fileQueue.length === 0) return;
-    
+
     setIsSending(true);
     const nextFile = fileQueue[0];
-    
+
     try {
       await onSend("", nextFile);
       setFileQueue(prev => {
@@ -264,7 +264,7 @@ export function MessageInput({
                 <Smile className="h-5 w-5" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" sideOffset={5}>
+            <PopoverContent className="w-auto p-0" sideOffset={5} side="top" align="start">
               <div className="w-full max-w-[320px]">
                 <div className="border-b flex items-center p-2 gap-1.5 bg-muted/50">
                   {[
