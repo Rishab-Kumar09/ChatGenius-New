@@ -84,11 +84,12 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // Configure for both AWS and Replit environments
+    // Configure for AWS deployment
     const PORT = parseInt(process.env.PORT || "5000", 10);
-    const HOST = process.env.HOST || "0.0.0.0";
+    const HOST = "0.0.0.0"; // Required for AWS
     server.listen(PORT, HOST, () => {
       log(`Server running in ${app.get("env")} mode on ${HOST}:${PORT}`);
+      log(`Server is AWS-ready`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
