@@ -86,9 +86,10 @@ app.use((req, res, next) => {
 
     // Configure for AWS deployment
     const PORT = process.env.PORT || 8080;
-    const HOST = "0.0.0.0";
+    const HOST = "0.0.0.0"; // Required for AWS EC2
     server.listen(PORT, HOST, () => {
       log(`Server running in ${app.get("env")} mode on port ${PORT}`);
+      log(`Server running on AWS EC2`);
       log(`Database path: ${process.env.DB_PATH || 'default path'}`);
     });
   } catch (error) {
