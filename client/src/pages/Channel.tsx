@@ -33,7 +33,6 @@ interface WebSocketMessage {
     action: string;
     channelId: number;
     userId: number;
-    memberCount?: number;
   };
 }
 
@@ -271,41 +270,6 @@ export function Channel() {
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-semibold">#{channel.name}</h1>
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span>•</span>
-                <Dialog open={isMemberListOpen} onOpenChange={setIsMemberListOpen}>
-                  <DialogTrigger asChild>
-                    <button className="hover:underline">
-                      {channel.memberCount || 0} members
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Members • {channel.name}</DialogTitle>
-                    </DialogHeader>
-                    <ScrollArea className="max-h-[400px] mt-4">
-                      <div className="space-y-4">
-                        {channel.members?.map((member) => (
-                          <div key={member.id} className="flex items-center gap-3">
-                            <UserAvatar user={member} className="h-8 w-8" />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  {member.displayName || member.username}
-                                </span>
-                                {member.role === 'owner' && (
-                                  <Crown className="h-4 w-4 text-yellow-500" />
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                @{member.username}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </DialogContent>
-                </Dialog>
                 {channel.isPrivate && (
                   <>
                     <span>•</span>

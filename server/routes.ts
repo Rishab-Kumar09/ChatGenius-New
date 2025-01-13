@@ -618,18 +618,16 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get all channels
+  // Get only channels where user is a member
   app.get("/api/channels", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.user!.id;
-      console.log('Fetching channels for user:', userId);
 
       // Get channel memberships for the current user
       const memberships = await db
         .select()
         .from(channelMembers)
         .where(eq(channelMembers.userId, userId));
-      console.log('Found memberships:', memberships);
 
       // Get pending invitations for the current user
       const invitations = await db
@@ -641,7 +639,6 @@ export function registerRoutes(app: Express): Server {
             eq(channelInvitations.status, 'pending')
           )
         );
-      console.log('Found invitations:', invitations);
 
       // Get only channels where user is a member
       const allChannels = await db
@@ -653,19 +650,6 @@ export function registerRoutes(app: Express): Server {
             memberships.map(m => m.channelId)
           )
         );
-      console.log('Found channels:', allChannels);
-
-      // Get member count for each channel
-      const memberCounts = await Promise.all(
-        allChannels.map(async (channel) => {
-          const [{ count }] = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(channelMembers)
-            .where(eq(channelMembers.channelId, channel.id));
-          return { channelId: channel.id, count };
-        })
-      );
-      const memberCountMap = new Map(memberCounts.map(m => [m.channelId, m.count]));
 
       // Create maps for membership status and role
       const membershipMap = new Map(memberships.map(m => [m.channelId, { isMember: true, role: m.role }]));
@@ -676,11 +660,9 @@ export function registerRoutes(app: Express): Server {
         ...channel,
         isMember: membershipMap.has(channel.id),
         role: membershipMap.get(channel.id)?.role || null,
-        isPendingInvitation: invitationMap.has(channel.id),
-        memberCount: memberCountMap.get(channel.id) || 0
+        isPendingInvitation: invitationMap.has(channel.id)
       }));
 
-      console.log('Returning channels with status:', channelsWithStatus);
       res.json(channelsWithStatus);
     } catch (error) {
       console.error('Failed to fetch channels:', error);
@@ -1394,24 +1376,17 @@ export function registerRoutes(app: Express): Server {
         role: 'member'
       });
 
-      // Get updated member count
-      const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(channelMembers)
-        .where(eq(channelMembers.channelId, channelId));
-
-      // Broadcast channel join event with updated count
+      // Broadcast channel join event
       broadcastEvent({
         type: 'channel',
         data: {
           action: 'member_joined',
           channelId,
-          userId,
-          memberCount: count
+          userId
         }
       });
 
-      res.json({ message: "Joined channel successfully", memberCount: count });
+      res.json({ message: "Joined channel successfully" });
     } catch (error) {
       console.error('Failed to join channel:', error);
       res.status(500).json({ error: "Failed to join channel" });
@@ -1572,20 +1547,13 @@ export function registerRoutes(app: Express): Server {
           role: 'member'
         });
 
-        // Get updated member count
-        const [{ count }] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(channelMembers)
-          .where(eq(channelMembers.channelId, parseInt(channelId)));
-
-        // Broadcast channel join event with updated count
+        // Broadcast channel join event
         broadcastEvent({
           type: 'channel',
           data: {
             action: 'member_joined',
             channelId: parseInt(channelId),
-            userId,
-            memberCount: count
+            userId
           }
         });
       }
@@ -1623,14 +1591,13 @@ export function registerRoutes(app: Express): Server {
           role: channelMembers.role
         })
         .from(channelMembers)
-        .where(eq(channelMembers.channelId, channelId))
-        .innerJoin(users, eq(users.id, channelMembers.userId));
+        .leftJoin(users, eq(channelMembers.userId, users.id))
+        .where(eq(channelMembers.channelId, channelId));
 
       // Return channel with member details
       res.json({
         ...channel,
-        memberCount: members.length,
-        members: members
+        members
       });
     } catch (error) {
       console.error('Error fetching channel:', error);
@@ -1686,20 +1653,13 @@ export function registerRoutes(app: Express): Server {
           )
         );
 
-      // Get updated member count
-      const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(channelMembers)
-        .where(eq(channelMembers.channelId, channelId));
-
       // Broadcast member left event
       broadcastEvent({
         type: 'channel',
         data: {
           action: 'member_left',
           channelId,
-          userId,
-          memberCount: count
+          userId
         }
       });
 
