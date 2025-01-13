@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { cn } from "../lib/utils";
-import { File as FileIcon, Download } from "lucide-react";
+import { File as FileIcon, Download, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import axios from "axios";
+import { Input } from "./ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +34,61 @@ function formatFileSize(bytes: number): string {
 
 export function Message({ message, isLastInGroup }: MessageProps) {
   const [showFullImage, setShowFullImage] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(message.content);
+  const queryClient = useQueryClient();
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, content }: { id: string, content: string }) => {
+      const response = await axios.patch(`/api/messages/${id}`, { content });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/messages'] });
+      setIsEditing(false);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await axios.delete(`/api/messages/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/messages'] });
+    }
+  });
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setEditedContent(message.content);
+  };
+
+  const handleSaveEdit = async () => {
+    if (editedContent.trim() !== message.content) {
+      await editMutation.mutateAsync({
+        id: message.id.toString(),
+        content: editedContent.trim()
+      });
+    }
+    setIsEditing(false);
+  };
+
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this message?')) {
+      await deleteMutation.mutateAsync(message.id.toString());
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setEditedContent(message.content);
+    }
+  };
 
   const handleImageDownload = (url: string, fileName: string) => {
     const link = document.createElement('a');
@@ -96,17 +160,52 @@ export function Message({ message, isLastInGroup }: MessageProps) {
         className="h-8 w-8 mt-1"
       />
       <div className="flex-1 overflow-hidden">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline gap-2 group">
           <span className="text-sm font-medium text-white">
             {message.sender.displayName || message.sender.username}
           </span>
           <span className="text-xs text-white/50">
             {formatTimestamp(message.timestamp)}
+            {message.isEdited && " (edited)"}
           </span>
+          <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleEdit}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         
         <div>
-          {message.content && (
+          {message.content && isEditing ? (
+            <div className="flex gap-2 items-center">
+              <Input
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="flex-1"
+                autoFocus
+              />
+              <Button size="sm" onClick={handleSaveEdit}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => {
+                setIsEditing(false);
+                setEditedContent(message.content);
+              }}>Cancel</Button>
+            </div>
+          ) : (
             <p className="text-white/90">{message.content}</p>
           )}
           {message.fileUrl && renderFileContent()}
