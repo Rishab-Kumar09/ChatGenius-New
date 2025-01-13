@@ -85,8 +85,8 @@ app.use((req, res, next) => {
     }
 
     // Configure for AWS deployment
-    const PORT = process.env.PORT || 8080;
-    const HOST = "0.0.0.0"; // Required for AWS EC2
+    const PORT = process.env.PORT || 3000;
+    const HOST = "0.0.0.0";
     server.listen(PORT, HOST, () => {
       log(`Server running in ${app.get("env")} mode on port ${PORT}`);
       log(`Server running on AWS EC2`);
