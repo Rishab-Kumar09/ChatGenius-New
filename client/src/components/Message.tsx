@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useUser } from '../hooks/use-user';
 import { cn } from "../lib/utils";
-import { File as FileIcon, Download, MoreVertical, Pencil, Trash2, MessageSquare } from "lucide-react";
+import { File as FileIcon, Download, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { Input } from "./ui/input";
