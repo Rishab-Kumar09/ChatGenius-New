@@ -46,7 +46,7 @@ export function Channel() {
   const { query: inviteQuery, setQuery: setInviteQuery, results: searchResults } = useSearch();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { sendMessage, isConnected, lastJsonMessage } = useWebSocket();
+  const { sendMessage, isConnected, lastJsonMessage, sendReaction } = useWebSocket();
   const [isMemberListOpen, setIsMemberListOpen] = useState(false);
 
   // Fetch channel details
@@ -145,24 +145,14 @@ export function Channel() {
         throw new Error('No current user');
       }
 
-      if (!isConnected) {
-        console.error('❌ WebSocket not connected');
-        toast({
-          title: "Connection Error",
-          description: "Lost connection to server. Please refresh the page.",
-          variant: "destructive"
-        });
-        throw new Error('WebSocket not connected');
-      }
-
       console.log('🎯 Adding reaction:', { messageId, emoji, user });
       
       // Send reaction through WebSocket
-      sendMessage({
-        type: 'reaction_update',
-        messageId,
-        emoji,
-        userId: user.id
+      await sendReaction(messageId, emoji, user.id);
+      
+      // Refetch messages to update reactions
+      await queryClient.invalidateQueries({ 
+        queryKey: [`/api/messages?channelId=${channelId}`]
       });
       
       console.log('✅ Reaction sent successfully');
@@ -209,13 +199,23 @@ export function Channel() {
     }
   };
 
-  // Listen for member count updates
+  // Listen for member count updates and reaction updates
   useEffect(() => {
-    if (lastJsonMessage && lastJsonMessage.type === 'channel' && 
-        lastJsonMessage.data.channelId === parseInt(channelId!, 10) && 
-        (lastJsonMessage.data.action === 'member_joined' || lastJsonMessage.data.action === 'member_left')) {
-      // Refetch channel details when membership changes
-      queryClient.invalidateQueries({ queryKey: [`/api/channels/${channelId}`] });
+    if (lastJsonMessage) {
+      if (lastJsonMessage.type === 'channel' && 
+          lastJsonMessage.data.channelId === parseInt(channelId!, 10) && 
+          (lastJsonMessage.data.action === 'member_joined' || lastJsonMessage.data.action === 'member_left')) {
+        // Refetch channel details when membership changes
+        queryClient.invalidateQueries({ queryKey: [`/api/channels/${channelId}`] });
+      }
+      
+      // Listen for reaction updates
+      if (lastJsonMessage.type === 'reaction_update') {
+        // Refetch messages to update reactions
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/messages?channelId=${channelId}`]
+        });
+      }
     }
   }, [lastJsonMessage, channelId, queryClient]);
 

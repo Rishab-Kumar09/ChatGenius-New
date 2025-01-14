@@ -38,8 +38,31 @@ export function useWebSocket() {
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
+    } else {
+      toast({
+        title: "Connection Error",
+        description: "Lost connection to server. Please refresh the page.",
+        variant: "destructive"
+      });
     }
-  }, []);
+  }, [toast]);
 
-  return { isConnected, lastJsonMessage, sendMessage };
+  const sendReaction = useCallback(async (messageId: string, emoji: string, userId: number) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'reaction_update',
+        messageId,
+        emoji,
+        userId
+      }));
+    } else {
+      toast({
+        title: "Connection Error",
+        description: "Lost connection to server. Please refresh the page.",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  return { isConnected, lastJsonMessage, sendMessage, sendReaction };
 } 

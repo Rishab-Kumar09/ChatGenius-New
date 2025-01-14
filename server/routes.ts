@@ -1692,19 +1692,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Message not found or you don't have permission to delete it" });
       }
 
-      // Delete the file if it exists
-      if (message.fileUrl) {
-        const filePath = path.join(process.env.HOME || process.cwd(), '.data', message.fileUrl.replace('/uploads/', ''));
-        try {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (error) {
-          console.error('Failed to delete file:', error);
-          // Continue with message deletion even if file deletion fails
-        }
-      }
-
       // Delete message reactions first
       await db
         .delete(reactions)

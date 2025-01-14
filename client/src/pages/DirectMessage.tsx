@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { MessageInput } from "@/components/MessageInput";
 import { UserAvatar } from "@/components/UserAvatar";
-import { useWebSocket } from "@/lib/useWebSocket";
+import { useWebSocket } from "@/hooks/use-websocket";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Message, User, ThreadMessage } from "@/lib/types";
@@ -16,11 +16,28 @@ import { cn } from "@/lib/utils";
 
 export function DirectMessage() {
   const { id } = useParams();
-  const { messages: wsMessages, isConnected, presenceUpdates, sendReaction } = useWebSocket();
+  const { isConnected, lastJsonMessage, sendMessage, sendReaction } = useWebSocket();
   const { user: currentUser } = useUser();
   const { toast } = useToast();
   const [replyingTo, setReplyingTo] = useState<ThreadMessage | null>(null);
+  const [wsMessages, setWsMessages] = useState<Message[]>([]);
+  const [presenceUpdates, setPresenceUpdates] = useState<Map<string, { status: string }>>(new Map());
   const queryClient = useQueryClient();
+
+  // Handle WebSocket messages
+  useEffect(() => {
+    if (lastJsonMessage) {
+      if (lastJsonMessage.type === 'message') {
+        setWsMessages(prev => [...prev, lastJsonMessage.data]);
+      } else if (lastJsonMessage.type === 'presence') {
+        setPresenceUpdates(prev => {
+          const next = new Map(prev);
+          next.set(lastJsonMessage.data.userId, { status: lastJsonMessage.data.status });
+          return next;
+        });
+      }
+    }
+  }, [lastJsonMessage]);
 
   // Fetch recipient user data
   const { data: recipientUser } = useQuery<User>({
@@ -71,7 +88,7 @@ export function DirectMessage() {
   }, [currentUser, queryClient, id]);
 
   // Combine server messages with websocket messages
-  const allMessages = [...messages, ...wsMessages.filter(m => m.dmId === id || m.recipientId === id)];
+  const allMessages = [...messages, ...wsMessages.filter((m: Message) => m.dmId === id || m.recipientId === id)];
 
   const handleSendMessage = async (content: string, file?: File) => {
     try {
@@ -137,20 +154,15 @@ export function DirectMessage() {
         throw new Error('No recipient ID or current user');
       }
 
-      if (!isConnected) {
-        console.error('❌ WebSocket not connected');
-        toast({
-          title: "Connection Error",
-          description: "Lost connection to server. Please refresh the page.",
-          variant: "destructive"
-        });
-        throw new Error('WebSocket not connected');
-      }
-
       console.log('🎯 Adding reaction:', { messageId, emoji, currentUser });
       
       // Send reaction through WebSocket
       await sendReaction(messageId, emoji, currentUser.id);
+      
+      // Refetch messages to update reactions
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/messages', id]
+      });
       
       console.log('✅ Reaction sent successfully');
 
@@ -200,6 +212,16 @@ export function DirectMessage() {
       throw error;
     }
   };
+
+  // Listen for reaction updates
+  useEffect(() => {
+    if (lastJsonMessage && lastJsonMessage.type === 'reaction_update') {
+      // Refetch messages to update reactions
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/messages', id]
+      });
+    }
+  }, [lastJsonMessage, id, queryClient]);
 
   if (!recipientUser) {
     return null;
