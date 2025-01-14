@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Bot, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 export function Home() {
   return (
@@ -7,7 +7,7 @@ export function Home() {
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Bot className="h-8 w-8 text-blue-500" />
+            <MessageSquare className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">Welcome to Chat Genius</h1>
           </div>
           <p className="text-muted-foreground">
