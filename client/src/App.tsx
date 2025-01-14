@@ -10,6 +10,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import { UserProfile } from "@/pages/UserProfile";
 import { useUser } from "@/hooks/use-user";
 import { ToastProvider, ToastViewport } from "./components/ui/toast";
+import { BotChat } from "@/pages/BotChat"; // Added import for BotChat
 
 function App() {
   const { user, isLoading } = useUser();
@@ -35,6 +36,7 @@ function App() {
           <Route path="/dm/:id" component={DirectMessage} />
           <Route path="/profile" component={ProfilePage} />
           <Route path="/profile/:id" component={UserProfile} />
+          <Route path="/bot" component={BotChat} /> {/* Added route for BotChat */}
           <Route component={NotFound} />
         </Switch>
       </MainLayout>
