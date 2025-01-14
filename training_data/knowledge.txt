@@ -1,0 +1,6 @@
+
+ChatGenius is a modern real-time chat application designed for seamless team communication. 
+It features real-time messaging, public and private channels, rich message formatting, and file attachments.
+The application supports user profiles with customizable avatars, message search functionality, and a responsive design.
+Users can create channels, send direct messages, and use emoji reactions.
+The system is built using TypeScript, React, and Express.js with a SQLite database.

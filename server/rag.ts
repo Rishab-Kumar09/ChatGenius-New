@@ -1,37 +1,28 @@
 
 import { OpenAI } from "langchain/llms/openai";
 import { RetrievalQAChain } from "langchain/chains";
-import { ChromaClient } from "chromadb";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
-import { ChromaVectorStore } from "langchain/vectorstores/chroma";
 import { TextLoader } from "langchain/document_loaders/fs/text";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { DirectoryLoader } from "langchain/document_loaders/fs/directory";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
 
-// Initialize ChromaDB
-const client = new ChromaClient();
+// Initialize OpenAI embeddings
 const embeddings = new OpenAIEmbeddings();
-
-// Initialize vector store
-const vectorStore = new ChromaVectorStore(embeddings, {
-  collectionName: "chat_documents",
-  client,
-});
+let vectorStore: MemoryVectorStore;
 
 // Document loader and processor
 export async function loadDocuments(directory: string) {
-  const loader = new DirectoryLoader(directory, {
-    ".txt": (path) => new TextLoader(path),
-  });
-  
+  const loader = new TextLoader(directory);
   const docs = await loader.load();
+  
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 1000,
     chunkOverlap: 200,
   });
   
   const splitDocs = await splitter.splitDocuments(docs);
-  await vectorStore.addDocuments(splitDocs);
+  vectorStore = await MemoryVectorStore.fromDocuments(splitDocs, embeddings);
+  return vectorStore;
 }
 
 // RAG Chain setup
@@ -40,10 +31,14 @@ const model = new OpenAI({
   temperature: 0.7,
 });
 
-const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
-
 // Query function
 export async function queryRAG(question: string) {
+  if (!vectorStore) {
+    throw new Error("Documents not loaded. Call loadDocuments first.");
+  }
+
+  const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
+
   try {
     const response = await chain.call({
       query: question,

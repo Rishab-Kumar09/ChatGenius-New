@@ -11,10 +11,19 @@ import { loadDocuments, queryRAG } from './rag';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Initialize RAG with documents
-const docsDirectory = './training_data'; // Create this directory and add your documents
-loadDocuments(docsDirectory)
-  .then(() => console.log('Documents loaded into RAG system'))
+loadDocuments('./training_data/knowledge.txt')
+  .then(() => console.log('RAG system initialized with knowledge base'))
   .catch(console.error);
+
+// Add RAG query function
+export async function askRAG(question: string) {
+  try {
+    return await queryRAG(question);
+  } catch (error) {
+    console.error('Error querying RAG:', error);
+    return 'I encountered an error while processing your question.';
+  }
+}
 
 export async function generateMessageSuggestions(
   channelId: number,
