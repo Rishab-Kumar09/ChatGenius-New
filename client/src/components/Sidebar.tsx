@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Hash, Plus, Trash2, Circle, Lock, Bell, LogOut } from "lucide-react";
+import { Hash, Plus, Trash2, Circle, Lock, Bell, LogOut, Bot } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
@@ -436,6 +436,23 @@ export function Sidebar({ className }: { className?: string }) {
               )}
             </div>
           ))}
+        </div>
+
+        <Separator className="bg-white/10 my-2" />
+
+        {/* AI Bot section */}
+        <div className="py-4">
+          <h2 className="text-lg font-semibold text-white/90 mb-2">AI Assistant</h2>
+          <div className="group flex items-center">
+            <Button
+              variant="ghost"
+              className="flex-1 justify-start mb-1 hover:bg-white/10 text-white/80 hover:text-white"
+              onClick={() => navigate('/bot')}
+            >
+              <Bot className="h-4 w-4 mr-2 text-blue-400" />
+              <span className="truncate">Chat with Bot</span>
+            </Button>
+          </div>
         </div>
 
         <Separator className="bg-white/10 my-2" />
