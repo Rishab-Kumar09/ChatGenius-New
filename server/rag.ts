@@ -1,3 +1,4 @@
+
 import { OpenAI } from "openai";
 import { PineconeClient } from "@pinecone-database/pinecone";
 import * as fs from 'fs';
@@ -133,4 +134,4 @@ export async function queryRAG(question: string): Promise<string> {
   }
 }
 
-export { loadDocuments, queryRAG };
+export { loadDocuments };
