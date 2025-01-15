@@ -1724,8 +1724,8 @@ export function registerRoutes(app: Express): Server {
     try {
       const { question } = req.body;
       
-      // Basic response logic
-      const response = `I'm a ChatGenius assistant. ChatGenius is a modern real-time chat application with features like real-time messaging, public/private channels, rich message formatting, file attachments, user profiles, and more. How can I help you learn more about these features?`;
+      // Use RAG system to get contextual response
+      const response = await queryRAG(question);
       
       res.json({ response });
     } catch (error) {
