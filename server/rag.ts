@@ -1,4 +1,3 @@
-
 import { OpenAI } from "openai";
 import { PineconeClient } from "@pinecone-database/pinecone";
 import * as fs from 'fs';
@@ -15,22 +14,22 @@ async function loadDocuments(filePath: string) {
     const pdfText = await loadPDFs('training_data/pdf/docs');
     const text = fs.readFileSync(filePath, 'utf8');
     const combinedText = `${text}\n\n${pdfText}`;
-    
+
     const chunks = splitIntoChunks(combinedText);
-    
+
     await pinecone.init({
       environment: "gcp-starter",
       apiKey: process.env.PINECONE_API_KEY!,
     });
-    
+
     const index = pinecone.Index(process.env.PINECONE_INDEX!);
-    
+
     for (const chunk of chunks) {
       const embedding = await openai.embeddings.create({
         input: chunk,
         model: "text-embedding-ada-002"
       });
-      
+
       await index.upsert({
         upsertRequest: {
           vectors: [{
@@ -41,7 +40,7 @@ async function loadDocuments(filePath: string) {
         }
       });
     }
-    
+
     initialized = true;
   } catch (error) {
     console.error('Error loading documents:', error);
@@ -53,7 +52,7 @@ async function loadPDFs(directory: string): Promise<string> {
   try {
     const pdfFiles = fs.readdirSync(directory).filter(file => file.endsWith('.pdf'));
     let allText = '';
-    
+
     for (const file of pdfFiles) {
       try {
         const dataBuffer = fs.readFileSync(path.join(directory, file));
@@ -63,7 +62,7 @@ async function loadPDFs(directory: string): Promise<string> {
         console.error(`Error loading PDF ${file}:`, error);
       }
     }
-    
+
     return allText;
   } catch (error) {
     console.error('Error accessing PDF directory:', error);
@@ -98,45 +97,7 @@ export async function queryRAG(question: string): Promise<string> {
 
   try {
     const index = pinecone.Index(process.env.PINECONE_INDEX!);
-    
-    const questionEmbedding = await openai.embeddings.create({
-      input: question,
-      model: "text-embedding-ada-002"
-    });
 
-    const queryResponse = await index.query({
-      queryRequest: {
-        vector: questionEmbedding.data[0].embedding,
-        topK: 5,
-        includeMetadata: true
-      }
-    });
-
-    const context = queryResponse.matches
-      ?.map(match => match.metadata?.text)
-      .join('\n\n');
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `You are a helpful assistant. Answer based on this context: ${context}`
-        },
-        { role: "user", content: question }
-      ]
-    });
-
-    return completion.choices[0].message.content || "I couldn't generate a relevant answer.";
-  } catch (error) {
-    console.error('Error querying RAG:', error);
-    return "Sorry, I encountered an error while processing your question.";
-  }
-}
-
-  try {
-    const index = pinecone.Index(process.env.PINECONE_INDEX!);
-    
     const questionEmbedding = await openai.embeddings.create({
       input: question,
       model: "text-embedding-ada-002"
