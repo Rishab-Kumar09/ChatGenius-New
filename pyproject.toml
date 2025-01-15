@@ -1,0 +1,14 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain>=0.3.14",
+    "langchain-community>=0.3.14",
+    "langchain-openai>=0.3.0",
+    "langchain-pinecone>=0.2.2",
+    "pinecone-client>=4.1.2",
+    "pypdf>=5.1.0",
+    "python-dotenv>=1.0.1",
+]
