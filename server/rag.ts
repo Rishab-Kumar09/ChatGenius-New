@@ -4,13 +4,30 @@ import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { PineconeClient } from "@pinecone-database/pinecone";
 import { Document } from 'langchain/document';
 import * as fs from 'fs';
+import * as path from 'path';
+import pdf from 'pdf-parse';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const pinecone = new PineconeClient();
 
 let initialized = false;
 
+async function loadPDFs(directory: string) {
+  const pdfFiles = fs.readdirSync(directory).filter(file => file.endsWith('.pdf'));
+  let allText = '';
+  
+  for (const file of pdfFiles) {
+    const dataBuffer = fs.readFileSync(path.join(directory, file));
+    const data = await pdf(dataBuffer);
+    allText += data.text + '\n\n';
+  }
+  
+  return allText;
+}
+
 export async function loadDocuments(filePath: string) {
+  // Load PDF documents first
+  const pdfText = await loadPDFs('training_data/pdf');
   try {
     const text = fs.readFileSync(filePath, 'utf8');
     const splitter = new RecursiveCharacterTextSplitter({
