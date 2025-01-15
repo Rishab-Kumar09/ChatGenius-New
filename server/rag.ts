@@ -1,8 +1,6 @@
 
 import { OpenAI } from "openai";
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { PineconeClient } from "@pinecone-database/pinecone";
-import { Document } from 'langchain/document';
 import * as fs from 'fs';
 import * as path from 'path';
 import pdf from 'pdf-parse';
@@ -12,29 +10,16 @@ const pinecone = new PineconeClient();
 
 let initialized = false;
 
-async function loadPDFs(directory: string) {
-  try {
-    const pdfFiles = fs.readdirSync(directory).filter(file => file.endsWith('.pdf'));
-    let allText = '';
-    
-    console.log(`Loading ${pdfFiles.length} PDF files from ${directory}`);
-    
-    for (const file of pdfFiles) {
-      try {
-        const dataBuffer = fs.readFileSync(path.join(directory, file));
-        const data = await pdf(dataBuffer);
-        allText += `[Document: ${file}]\n${data.text}\n\n`;
-        console.log(`Successfully loaded ${file}`);
-      } catch (error) {
-        console.error(`Error loading PDF ${file}:`, error);
-      }
-    }
-    
-    return allText;
-  } catch (error) {
-    console.error('Error accessing PDF directory:', error);
-    return '';
+// Helper to split text into chunks with overlap
+function splitIntoChunks(text: string, chunkSize = 1000, overlap = 200): string[] {
+  const chunks: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const chunk = text.slice(i, i + chunkSize);
+    chunks.push(chunk);
+    i += chunkSize - overlap;
   }
+  return chunks;
 }
 
 export async function loadDocuments(filePath: string) {
@@ -44,10 +29,8 @@ export async function loadDocuments(filePath: string) {
     const text = fs.readFileSync(filePath, 'utf8');
     const combinedText = `${text}\n\n${pdfText}`;
     
-    const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
-      chunkOverlap: 200,
-    });
+    // Split text into chunks
+    const chunks = splitIntoChunks(combinedText);
     
     await pinecone.init({
       environment: "gcp-starter",
@@ -55,12 +38,11 @@ export async function loadDocuments(filePath: string) {
     });
     
     const index = pinecone.Index(process.env.PINECONE_INDEX!);
-    const docs = await splitter.createDocuments([text]);
     
-    // Convert documents to vectors and store in Pinecone
-    for (const doc of docs) {
+    // Process each chunk
+    for (const chunk of chunks) {
       const embedding = await openai.embeddings.create({
-        input: doc.pageContent,
+        input: chunk,
         model: "text-embedding-ada-002"
       });
       
@@ -69,7 +51,7 @@ export async function loadDocuments(filePath: string) {
           vectors: [{
             id: `doc-${Math.random()}`,
             values: embedding.data[0].embedding,
-            metadata: { text: doc.pageContent }
+            metadata: { text: chunk }
           }]
         }
       });
@@ -82,18 +64,38 @@ export async function loadDocuments(filePath: string) {
   }
 }
 
+async function loadPDFs(directory: string): Promise<string> {
+  try {
+    const pdfFiles = fs.readdirSync(directory).filter(file => file.endsWith('.pdf'));
+    let allText = '';
+    
+    for (const file of pdfFiles) {
+      try {
+        const dataBuffer = fs.readFileSync(path.join(directory, file));
+        const data = await pdf(dataBuffer);
+        allText += `[Document: ${file}]\n${data.text}\n\n`;
+      } catch (error) {
+        console.error(`Error loading PDF ${file}:`, error);
+      }
+    }
+    
+    return allText;
+  } catch (error) {
+    console.error('Error accessing PDF directory:', error);
+    return '';
+  }
+}
+
 export async function queryRAG(question: string): Promise<string> {
   if (!initialized) {
-    console.log('Attempting to initialize RAG system...');
     try {
       if (!process.env.OPENAI_API_KEY || !process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
         throw new Error('Missing required environment variables');
       }
       await loadDocuments('./training_data/knowledge.txt');
-      initialized = true;
     } catch (error) {
-      console.error('Failed to initialize RAG:', error);
-      return "I'm having trouble accessing my knowledge base. Please make sure all required API keys are set up in the Secrets tab.";
+      console.error('Failed to initialize:', error);
+      return "I'm having trouble accessing my knowledge base. Please check API configurations.";
     }
   }
 
@@ -106,21 +108,21 @@ export async function queryRAG(question: string): Promise<string> {
       model: "text-embedding-ada-002"
     });
 
-    // Query Pinecone
+    // Query Pinecone for relevant context
     const queryResponse = await index.query({
       queryRequest: {
         vector: questionEmbedding.data[0].embedding,
-        topK: 3,
+        topK: 5,
         includeMetadata: true
       }
     });
 
-    // Construct context from relevant documents
+    // Combine relevant contexts
     const context = queryResponse.matches
       ?.map(match => match.metadata?.text)
-      .join('\n');
+      .join('\n\n');
 
-    // Generate answer using context
+    // Generate response using context
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
@@ -132,9 +134,9 @@ export async function queryRAG(question: string): Promise<string> {
       ]
     });
 
-    return completion.choices[0].message.content || "Sorry, I couldn't generate an answer.";
+    return completion.choices[0].message.content || "I couldn't generate a relevant answer.";
   } catch (error) {
     console.error('Error querying RAG:', error);
-    return "Sorry, an error occurred while processing your question.";
+    return "Sorry, I encountered an error while processing your question.";
   }
 }
