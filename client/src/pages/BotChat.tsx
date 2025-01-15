@@ -21,7 +21,10 @@ export function BotChat() {
         body: JSON.stringify({ question: content })
       });
 
-      if (!response.ok) throw new Error('Failed to get bot response');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get bot response');
+      }
       const data = await response.json();
 
       // Add bot response
@@ -30,8 +33,8 @@ export function BotChat() {
       console.error('Error getting bot response:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: `I apologize, but I encountered an error: ${errorMessage}. Please try asking your question again.` 
+        content: `I apologize, but I encountered an error: ${errorMessage}. Please try asking your question again.`,
+        isBot: true
       }]);
     }
   };

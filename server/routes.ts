@@ -1730,14 +1730,16 @@ export function registerRoutes(app: Express): Server {
       
       const response = await queryRAG(question);
       if (!response) {
-        return res.status(500).json({ error: "Could not generate a response" });
+        return res.status(500).json({ error: "Could not generate a response. Please try again." });
       }
       
       res.json({ response });
     } catch (error) {
       console.error('Bot chat error:', error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ 
+        error: `Failed to process your question: ${errorMessage}. Please try again.`
+      });
     }
   });
 
