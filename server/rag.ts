@@ -90,7 +90,7 @@ export async function queryRAG(question: string): Promise<string> {
       initialized = true;
     } catch (error) {
       console.error('Failed to initialize RAG:', error);
-      return "I'm having trouble accessing my knowledge base. Please try again in a moment.";
+      throw new Error('Failed to initialize knowledge base');
     }
   }
 

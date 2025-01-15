@@ -1724,13 +1724,20 @@ export function registerRoutes(app: Express): Server {
     try {
       const { question } = req.body;
       
-      // Use RAG system to get contextual response
+      if (!question?.trim()) {
+        return res.status(400).json({ error: "Question is required" });
+      }
+      
       const response = await queryRAG(question);
+      if (!response) {
+        return res.status(500).json({ error: "Could not generate a response" });
+      }
       
       res.json({ response });
     } catch (error) {
       console.error('Bot chat error:', error);
-      res.status(500).json({ error: "Failed to process request" });
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      res.status(500).json({ error: errorMessage });
     }
   });
 

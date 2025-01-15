@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,14 +23,15 @@ export function BotChat() {
 
       if (!response.ok) throw new Error('Failed to get bot response');
       const data = await response.json();
-      
+
       // Add bot response
       setMessages(prev => [...prev, { content: data.response, isBot: true }]);
     } catch (error) {
       console.error('Error getting bot response:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       setMessages(prev => [...prev, { 
-        content: "Sorry, I encountered an error. Please try again.", 
-        isBot: true 
+        role: 'assistant', 
+        content: `I apologize, but I encountered an error: ${errorMessage}. Please try asking your question again.` 
       }]);
     }
   };
