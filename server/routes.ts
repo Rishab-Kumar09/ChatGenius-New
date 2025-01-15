@@ -10,6 +10,7 @@ import multer from 'multer';
 import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { SelectChannel } from "@db/schema";
+import { loadDocuments, queryRAG } from './rag'; // Updated import statement
 
 // Interface for SSE clients
 interface SSEClient {
@@ -814,11 +815,11 @@ export function registerRoutes(app: Express): Server {
       const query = req.query.query as string;
       const type = req.query.type as string;
       const currentUserId = req.user!.id;
-      
+
       if (!query) {
         return res.json({ messages: [], channels: [], users: [] });
       }
-      
+
       // If type is 'users', only search users
       if (type === 'users') {
         const foundUsers = await db
@@ -1723,16 +1724,16 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/bot/ask", requireAuth, async (req: Request, res: Response) => {
     try {
       const { question } = req.body;
-      
+
       if (!question?.trim()) {
         return res.status(400).json({ error: "Question is required" });
       }
-      
+
       const response = await queryRAG(question);
       if (!response) {
         return res.status(500).json({ error: "Could not generate a response. Please try again." });
       }
-      
+
       res.json({ response });
     } catch (error) {
       console.error('Bot chat error:', error);

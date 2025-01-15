@@ -172,4 +172,4 @@ export async function queryRAG(question: string): Promise<string> {
   }
 }
 
-export { loadDocuments };
+export { loadDocuments, queryRAG };
