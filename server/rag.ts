@@ -134,4 +134,42 @@ export async function queryRAG(question: string): Promise<string> {
   }
 }
 
+  try {
+    const index = pinecone.Index(process.env.PINECONE_INDEX!);
+    
+    const questionEmbedding = await openai.embeddings.create({
+      input: question,
+      model: "text-embedding-ada-002"
+    });
+
+    const queryResponse = await index.query({
+      queryRequest: {
+        vector: questionEmbedding.data[0].embedding,
+        topK: 5,
+        includeMetadata: true
+      }
+    });
+
+    const context = queryResponse.matches
+      ?.map(match => match.metadata?.text)
+      .join('\n\n');
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful assistant. Answer based on this context: ${context}`
+        },
+        { role: "user", content: question }
+      ]
+    });
+
+    return completion.choices[0].message.content || "I couldn't generate a relevant answer.";
+  } catch (error) {
+    console.error('Error querying RAG:', error);
+    return "Sorry, I encountered an error while processing your question.";
+  }
+}
+
 export { loadDocuments };
