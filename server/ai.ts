@@ -18,10 +18,14 @@ loadDocuments('./training_data/knowledge.txt')
 // Add RAG query function
 export async function askRAG(question: string) {
   try {
-    return await queryRAG(question);
+    const answer = await queryRAG(question);
+    if (!answer) {
+      return "I couldn't find relevant information to answer your question. Could you please rephrase it?";
+    }
+    return answer;
   } catch (error) {
     console.error('Error querying RAG:', error);
-    return 'I encountered an error while processing your question.';
+    return 'I encountered a technical issue. Please try asking your question again.';
   }
 }
 

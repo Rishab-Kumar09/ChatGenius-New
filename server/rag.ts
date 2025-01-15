@@ -38,10 +38,12 @@ async function loadPDFs(directory: string) {
 }
 
 export async function loadDocuments(filePath: string) {
-  // Load PDF documents first
-  const pdfText = await loadPDFs('training_data/pdf/docs');
   try {
+    // Load PDF documents first
+    const pdfText = await loadPDFs('training_data/pdf/docs');
     const text = fs.readFileSync(filePath, 'utf8');
+    const combinedText = `${text}\n\n${pdfText}`;
+    
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 200,
@@ -82,7 +84,14 @@ export async function loadDocuments(filePath: string) {
 
 export async function queryRAG(question: string): Promise<string> {
   if (!initialized) {
-    return "RAG system not initialized. Please load documents first.";
+    console.log('Attempting to initialize RAG system...');
+    try {
+      await loadDocuments('./training_data/knowledge.txt');
+      initialized = true;
+    } catch (error) {
+      console.error('Failed to initialize RAG:', error);
+      return "I'm having trouble accessing my knowledge base. Please try again in a moment.";
+    }
   }
 
   try {
