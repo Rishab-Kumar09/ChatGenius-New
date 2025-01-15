@@ -86,11 +86,14 @@ export async function queryRAG(question: string): Promise<string> {
   if (!initialized) {
     console.log('Attempting to initialize RAG system...');
     try {
+      if (!process.env.OPENAI_API_KEY || !process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
+        throw new Error('Missing required environment variables');
+      }
       await loadDocuments('./training_data/knowledge.txt');
       initialized = true;
     } catch (error) {
       console.error('Failed to initialize RAG:', error);
-      throw new Error('Failed to initialize knowledge base');
+      return "I'm having trouble accessing my knowledge base. Please make sure all required API keys are set up in the Secrets tab.";
     }
   }
 
