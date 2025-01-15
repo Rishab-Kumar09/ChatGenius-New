@@ -1719,5 +1719,20 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Bot chat endpoint
+  app.post("/api/bot/ask", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { question } = req.body;
+      
+      // Basic response logic
+      const response = `I'm a ChatGenius assistant. ChatGenius is a modern real-time chat application with features like real-time messaging, public/private channels, rich message formatting, file attachments, user profiles, and more. How can I help you learn more about these features?`;
+      
+      res.json({ response });
+    } catch (error) {
+      console.error('Bot chat error:', error);
+      res.status(500).json({ error: "Failed to process request" });
+    }
+  });
+
   return httpServer;
 }
