@@ -3,7 +3,8 @@ import { OpenAI } from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
 import * as fs from 'fs';
 import * as path from 'path';
-import pdf from 'pdf-parse';
+import * as pdfParse from 'pdf-parse';
+const pdf = (buffer: Buffer) => pdfParse.default(buffer);
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const pinecone = new Pinecone();
