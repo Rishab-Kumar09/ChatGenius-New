@@ -13,21 +13,33 @@ const pinecone = new PineconeClient();
 let initialized = false;
 
 async function loadPDFs(directory: string) {
-  const pdfFiles = fs.readdirSync(directory).filter(file => file.endsWith('.pdf'));
-  let allText = '';
-  
-  for (const file of pdfFiles) {
-    const dataBuffer = fs.readFileSync(path.join(directory, file));
-    const data = await pdf(dataBuffer);
-    allText += data.text + '\n\n';
+  try {
+    const pdfFiles = fs.readdirSync(directory).filter(file => file.endsWith('.pdf'));
+    let allText = '';
+    
+    console.log(`Loading ${pdfFiles.length} PDF files from ${directory}`);
+    
+    for (const file of pdfFiles) {
+      try {
+        const dataBuffer = fs.readFileSync(path.join(directory, file));
+        const data = await pdf(dataBuffer);
+        allText += `[Document: ${file}]\n${data.text}\n\n`;
+        console.log(`Successfully loaded ${file}`);
+      } catch (error) {
+        console.error(`Error loading PDF ${file}:`, error);
+      }
+    }
+    
+    return allText;
+  } catch (error) {
+    console.error('Error accessing PDF directory:', error);
+    return '';
   }
-  
-  return allText;
 }
 
 export async function loadDocuments(filePath: string) {
   // Load PDF documents first
-  const pdfText = await loadPDFs('training_data/pdf');
+  const pdfText = await loadPDFs('training_data/pdf/docs');
   try {
     const text = fs.readFileSync(filePath, 'utf8');
     const splitter = new RecursiveCharacterTextSplitter({
