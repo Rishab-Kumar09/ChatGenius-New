@@ -10,26 +10,12 @@ const pinecone = new PineconeClient();
 
 let initialized = false;
 
-// Helper to split text into chunks with overlap
-function splitIntoChunks(text: string, chunkSize = 1000, overlap = 200): string[] {
-  const chunks: string[] = [];
-  let i = 0;
-  while (i < text.length) {
-    const chunk = text.slice(i, i + chunkSize);
-    chunks.push(chunk);
-    i += chunkSize - overlap;
-  }
-  return chunks;
-}
-
-export async function loadDocuments(filePath: string) {
+async function loadDocuments(filePath: string) {
   try {
-    // Load PDF documents first
     const pdfText = await loadPDFs('training_data/pdf/docs');
     const text = fs.readFileSync(filePath, 'utf8');
     const combinedText = `${text}\n\n${pdfText}`;
     
-    // Split text into chunks
     const chunks = splitIntoChunks(combinedText);
     
     await pinecone.init({
@@ -39,7 +25,6 @@ export async function loadDocuments(filePath: string) {
     
     const index = pinecone.Index(process.env.PINECONE_INDEX!);
     
-    // Process each chunk
     for (const chunk of chunks) {
       const embedding = await openai.embeddings.create({
         input: chunk,
@@ -86,8 +71,20 @@ async function loadPDFs(directory: string): Promise<string> {
   }
 }
 
+function splitIntoChunks(text: string, chunkSize = 1000, overlap = 200): string[] {
+  const chunks: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const chunk = text.slice(i, i + chunkSize);
+    chunks.push(chunk);
+    i += chunkSize - overlap;
+  }
+  return chunks;
+}
+
 export async function queryRAG(question: string): Promise<string> {
   if (!initialized) {
+    console.log('Attempting to initialize RAG system...');
     try {
       if (!process.env.OPENAI_API_KEY || !process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
         throw new Error('Missing required environment variables');
@@ -102,13 +99,11 @@ export async function queryRAG(question: string): Promise<string> {
   try {
     const index = pinecone.Index(process.env.PINECONE_INDEX!);
     
-    // Get question embedding
     const questionEmbedding = await openai.embeddings.create({
       input: question,
       model: "text-embedding-ada-002"
     });
 
-    // Query Pinecone for relevant context
     const queryResponse = await index.query({
       queryRequest: {
         vector: questionEmbedding.data[0].embedding,
@@ -117,18 +112,16 @@ export async function queryRAG(question: string): Promise<string> {
       }
     });
 
-    // Combine relevant contexts
     const context = queryResponse.matches
       ?.map(match => match.metadata?.text)
       .join('\n\n');
 
-    // Generate response using context
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: `You are a helpful assistant for ChatGenius. Answer based on this context: ${context}`
+          content: `You are a helpful assistant. Answer based on this context: ${context}`
         },
         { role: "user", content: question }
       ]
@@ -140,3 +133,5 @@ export async function queryRAG(question: string): Promise<string> {
     return "Sorry, I encountered an error while processing your question.";
   }
 }
+
+export { loadDocuments };
