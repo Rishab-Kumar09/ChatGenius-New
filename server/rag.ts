@@ -3,8 +3,7 @@ import { OpenAI } from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
 import * as fs from 'fs';
 import * as path from 'path';
-import * as pdfParse from 'pdf-parse';
-const pdf = (buffer: Buffer) => pdfParse.default(buffer);
+import pdfParse from 'pdf-parse';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const pinecone = new Pinecone();
@@ -52,13 +51,18 @@ async function loadDocuments(filePath: string) {
 
 async function loadPDFs(directory: string): Promise<string> {
   try {
+    if (!fs.existsSync(directory)) {
+      console.warn(`Directory ${directory} does not exist`);
+      return '';
+    }
+    
     const pdfFiles = fs.readdirSync(directory).filter(file => file.endsWith('.pdf'));
     let allText = '';
 
     for (const file of pdfFiles) {
       try {
         const dataBuffer = fs.readFileSync(path.join(directory, file));
-        const data = await pdf(dataBuffer);
+        const data = await pdfParse(dataBuffer);
         allText += `[Document: ${file}]\n${data.text}\n\n`;
       } catch (error) {
         console.error(`Error loading PDF ${file}:`, error);
