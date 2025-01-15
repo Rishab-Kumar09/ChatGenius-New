@@ -12,6 +12,10 @@ let initialized = false;
 
 async function loadDocuments(filePath: string) {
   try {
+    if (!process.env.OPENAI_API_KEY || !process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
+      throw new Error('Missing required environment variables. Please check OPENAI_API_KEY, PINECONE_API_KEY, and PINECONE_INDEX');
+    }
+    
     const pdfText = await loadPDFs('training_data/pdf/docs');
     const text = fs.readFileSync(filePath, 'utf8');
     const combinedText = `${text}\n\n${pdfText}`;
