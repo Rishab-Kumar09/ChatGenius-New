@@ -3,6 +3,7 @@ import { messages } from "@db/schema";
 import { db } from "@db";
 import { desc, eq } from "drizzle-orm";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { queryDocument } from "./documentProcessor";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY environment variable is not set");
@@ -31,35 +32,34 @@ async function getConversationHistory(userId: number, limit: number = 10) {
 
 export async function generateAIResponse(userMessage: string, userId?: number): Promise<string> {
   try {
-    // Get conversation history if userId is provided
-    const history = userId ? await getConversationHistory(userId) : [];
+    // Use queryDocument to get relevant documents
+    const documents = await queryDocument(userMessage);
     
-    const apiMessages: ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content: `You are a helpful AI assistant in a chat application. You should be friendly, 
-        concise, and helpful. You have access to the conversation history for context. 
-        Your responses should be natural and engaging, while maintaining a helpful and professional tone.
-        You should avoid being overly formal or robotic.`
-      },
-      ...history.map(msg => ({
-        role: (msg.senderId === userId ? "user" : "assistant") as Role,
-        content: msg.content || ""
-      })),
-      {
-        role: "user",
-        content: userMessage
-      }
-    ];
+    if (!documents || documents.length === 0) {
+      return "I couldn't find any relevant information in the uploaded documents.";
+    }
 
+    // Create a context from the relevant documents
+    const context = documents.map(doc => doc.pageContent).join('\n\n');
+
+    // Generate a response using the context
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
-      messages: apiMessages,
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that answers questions based on the provided documents. Use only the information from the documents to answer questions."
+        },
+        {
+          role: "user",
+          content: `Context from documents:\n${context}\n\nQuestion: ${userMessage}\n\nAnswer:`
+        }
+      ],
       temperature: 0.7,
-      max_tokens: 150,
+      max_tokens: 500
     });
 
-    return response.choices[0].message.content || "I'm not sure how to respond to that.";
+    return response.choices[0].message.content || "I apologize, but I couldn't generate a response based on the documents.";
   } catch (error) {
     console.error('Error generating AI response:', error);
     return "I apologize, but I'm having trouble processing your message right now.";

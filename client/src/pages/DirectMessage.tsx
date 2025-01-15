@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useEventSource } from "@/hooks/use-event-source";
+import { DocumentUpload } from "@/components/DocumentUpload";
 
 export function DirectMessage() {
   const { id } = useParams();
@@ -209,19 +210,18 @@ export function DirectMessage() {
   const userStatus = 'online'; // Simplified for now since we removed WebSocket presence
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b p-4">
+    <div className="flex-1 flex flex-col h-full">
+      <div className="border-b p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <UserAvatar user={recipientUser} className="h-10 w-10" interactive />
+          <UserAvatar user={recipientUser} />
           <div>
-            <h1 className="text-xl font-semibold">
-              {recipientUser?.displayName || recipientUser?.username || 'Loading...'}
-            </h1>
-            {recipientUser?.status && (
-              <p className="text-sm text-muted-foreground">{recipientUser.status}</p>
-            )}
+            <h2 className="font-semibold">{recipientUser.displayName || recipientUser.username}</h2>
+            <p className="text-sm text-muted-foreground">{userStatus}</p>
           </div>
         </div>
+        {recipientUser.username === 'ai-assistant' && (
+          <DocumentUpload />
+        )}
       </div>
 
       <div className="flex-1 relative">

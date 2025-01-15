@@ -11,6 +11,7 @@ import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'http';
 import { generateAIResponse, generateMessageSuggestions, generateQuickReplies } from "./ai";
+import { processDocument } from "./documentProcessor";
 
 // Extend Express Request type
 declare global {
@@ -320,11 +321,11 @@ export function registerRoutes(app: Express): Server {
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
       // Determine the upload path based on file type
-      let uploadPath = path.join(process.env.HOME || process.cwd(), '.data', 'uploads');
+      let uploadPath = path.join(process.cwd(), 'data', 'uploads');
 
       // If it's an avatar upload, use the avatars subdirectory
       if (file.fieldname === 'avatar') {
-        uploadPath = path.join(process.env.HOME || process.cwd(), '.data', 'uploads', 'avatars');
+        uploadPath = path.join(process.cwd(), 'data', 'uploads', 'avatars');
       }
 
       // Create directory if it doesn't exist
@@ -1946,6 +1947,47 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('AI chat error:', error);
       res.status(500).json({ error: "Failed to process AI chat message" });
+    }
+  });
+
+  // Upload training document endpoint
+  app.post("/api/documents/upload", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      if (!req.file.mimetype.includes('pdf')) {
+        return res.status(400).json({ error: "Only PDF files are supported" });
+      }
+
+      // Process the document
+      await processDocument(req.file.path);
+
+      res.json({ message: "Document processed successfully" });
+    } catch (error) {
+      console.error('Failed to process document:', error);
+      res.status(500).json({ error: "Failed to process document" });
+    }
+  });
+
+  // Process all documents in uploads directory
+  app.post("/api/documents/process-all", async (req: Request, res: Response) => {
+    try {
+      const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
+      const files = fs.readdirSync(uploadsDir);
+      
+      for (const file of files) {
+        if (file.toLowerCase().endsWith('.pdf')) {
+          const filePath = path.join(uploadsDir, file);
+          await processDocument(filePath);
+        }
+      }
+      
+      res.json({ message: "All documents processed successfully" });
+    } catch (error) {
+      console.error("Error processing documents:", error);
+      res.status(500).json({ error: "Failed to process documents" });
     }
   });
 
