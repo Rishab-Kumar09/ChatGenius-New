@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from '@tanstack/react-query';
-import { Paperclip, Send } from 'lucide-react';
+import { Paperclip, Send, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { useQuery } from '@tanstack/react-query';
 
 interface MessageInputProps {
   channelId?: string;
@@ -19,6 +20,17 @@ interface User {
   id: number;
   username: string;
   displayName: string | null;
+}
+
+interface Message {
+  id: string;
+  content: string;
+  sender: {
+    id: number;
+    username: string;
+    displayName: string | null;
+  };
+  timestamp: string;
 }
 
 export function MessageInput({ 
@@ -39,6 +51,18 @@ export function MessageInput({
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Fetch the parent message if we're replying
+  const { data: parentMessage } = useQuery<Message>({
+    queryKey: ['message', parentId],
+    queryFn: async () => {
+      if (!parentId) return null;
+      const response = await fetch(`/api/messages/${parentId}`);
+      if (!response.ok) throw new Error('Failed to fetch message');
+      return response.json();
+    },
+    enabled: !!parentId
+  });
 
   // Focus textarea when replying to a message
   useEffect(() => {
@@ -165,57 +189,82 @@ export function MessageInput({
   }, [handleSubmit]);
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2 items-end relative">
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        onChange={() => {
-          if (fileInputRef.current?.files?.length) {
-            handleSubmit(new Event('submit') as any);
-          }
-        }}
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <Paperclip className="h-5 w-5" />
-      </Button>
-      <div className="flex-1 relative">
-        <Textarea
-          ref={textareaRef}
-          value={content}
-          onChange={handleContentChange}
-          onKeyPress={handleKeyPress}
-          placeholder={placeholder}
-          className="min-h-[60px] resize-none"
-        />
-        
-        {/* Mention suggestions */}
-        {showMentions && mentionResults.length > 0 && (
-          <div className="absolute bottom-full left-0 mb-1 w-64 bg-background border rounded-lg shadow-lg overflow-hidden">
-            {mentionResults.map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2"
-                onClick={() => insertMention(user)}
-              >
-                <span className="font-medium">{user.displayName || user.username}</span>
-                {user.displayName && (
-                  <span className="text-sm text-muted-foreground">@{user.username}</span>
-                )}
-              </button>
-            ))}
+    <form onSubmit={handleSubmit} className="p-4 border-t flex flex-col gap-2">
+      {/* Reply Preview */}
+      {parentMessage && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+          <div className="flex-1">
+            <div className="text-xs text-muted-foreground">
+              Replying to {parentMessage.sender.displayName || parentMessage.sender.username}
+            </div>
+            <div className="text-sm truncate">{parentMessage.content}</div>
           </div>
-        )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => {
+              onReplyComplete?.();
+            }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <div className="flex gap-2 items-end">
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={() => {
+            if (fileInputRef.current?.files?.length) {
+              handleSubmit(new Event('submit') as any);
+            }
+          }}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Paperclip className="h-5 w-5" />
+        </Button>
+        <div className="flex-1 relative">
+          <Textarea
+            ref={textareaRef}
+            value={content}
+            onChange={handleContentChange}
+            onKeyPress={handleKeyPress}
+            placeholder={placeholder}
+            className="min-h-[60px] resize-none"
+          />
+          
+          {/* Mention suggestions */}
+          {showMentions && mentionResults.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-1 w-64 bg-background border rounded-lg shadow-lg overflow-hidden">
+              {mentionResults.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2"
+                  onClick={() => insertMention(user)}
+                >
+                  <span className="font-medium">{user.displayName || user.username}</span>
+                  {user.displayName && (
+                    <span className="text-sm text-muted-foreground">@{user.username}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <Button type="submit" size="icon" disabled={isLoading || (!content.trim() && !fileInputRef.current?.files?.length)}>
+          <Send className="h-5 w-5" />
+        </Button>
       </div>
-      <Button type="submit" size="icon" disabled={isLoading || (!content.trim() && !fileInputRef.current?.files?.length)}>
-        <Send className="h-5 w-5" />
-      </Button>
     </form>
   );
 }

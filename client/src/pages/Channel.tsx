@@ -77,9 +77,15 @@ export function Channel() {
         throw new Error('You must be a member of this channel to send messages');
       }
 
+      // Check if replying to Sarah's message
+      let messageContent = content;
+      if (replyingTo?.sender.username === 'ai-assistant') {
+        messageContent = `@sarah ${content}`;
+      }
+
       const formData = new FormData();
-      if (content.trim()) {
-        formData.append('content', content);
+      if (messageContent.trim()) {
+        formData.append('content', messageContent);
       }
       formData.append('channelId', channelId!);
       if (replyingTo?.id) {
@@ -380,6 +386,8 @@ export function Channel() {
               <MessageInput 
                 channelId={channelId}
                 placeholder="Type a message..."
+                parentId={replyingTo?.id}
+                onReplyComplete={() => setReplyingTo(null)}
               />
             </div>
           </>
