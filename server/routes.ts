@@ -484,10 +484,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ error: 'AI assistant not found' });
       }
 
-      // Check if this is a DM to Sarah
-      const isAIDM = recipientId && recipientId === aiAssistant.id.toString();
-
-      // Check for mentions in content
+      // Check if this is a DM to Sarah or if the message mentions Sarah
+      const isAIDM = recipientId && parseInt(recipientId) === aiAssistant.id;
       const mentionRegex = /@([^@\n]+?)(?=\s|$)/g;
       const mentions = content?.match(mentionRegex) || [];
       const hasSarahMention = mentions.some((mention: string) => {
@@ -531,7 +529,7 @@ export function registerRoutes(app: Express): Server {
             content: aiResponse,
             senderId: aiAssistant.id,
             channelId: channelId ? parseInt(channelId) : null,
-            recipientId: channelId ? null : req.user!.id,
+            recipientId: isAIDM ? req.user!.id : null,
           })
           .returning();
 
