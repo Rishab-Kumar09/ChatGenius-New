@@ -835,15 +835,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get message suggestions (mock data for now)
+  // Get message suggestions
   app.get("/api/suggestions", requireAuth, async (req: Request, res: Response) => {
     try {
-      // Return mock suggestions based on input
-      const suggestions = [
-        "Thanks for the update!",
-        "I'll look into that",
-        "Great work everyone!"
-      ];
+      const { input } = req.query;
+      const suggestions = await generateMessageSuggestions(
+        parseInt(req.query.channelId as string),
+        input as string
+      );
       res.json(suggestions);
     } catch (error) {
       console.error('Failed to get suggestions:', error);
@@ -851,15 +850,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get quick replies (mock data for now)
+  // Get quick replies
   app.get("/api/quick-replies", requireAuth, async (req: Request, res: Response) => {
     try {
-      // Return mock quick replies
-      const replies = [
-        "Got it, thanks!",
-        "I'll get back to you soon",
-        "Can you provide more details?"
-      ];
+      const { messageContent } = req.query;
+      if (!messageContent) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+      const replies = await generateQuickReplies(messageContent as string);
       res.json(replies);
     } catch (error) {
       console.error('Failed to get quick replies:', error);

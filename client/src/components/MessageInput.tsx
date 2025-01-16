@@ -11,6 +11,7 @@ interface MessageInputProps {
   parentId?: string;
   onReplyComplete?: () => void;
   placeholder?: string;
+  onSend?: (content: string) => Promise<void>;
 }
 
 export function MessageInput({ 
@@ -18,7 +19,8 @@ export function MessageInput({
   recipientId, 
   parentId,
   onReplyComplete,
-  placeholder = "Type a message..."
+  placeholder = "Type a message...",
+  onSend
 }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +34,12 @@ export function MessageInput({
 
     try {
       setIsLoading(true);
+
+      if (onSend) {
+        await onSend(content);
+        setContent("");
+        return;
+      }
 
       const formData = new FormData();
       formData.append('content', content);

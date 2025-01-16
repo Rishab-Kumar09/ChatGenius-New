@@ -24,7 +24,7 @@ export default function DMPage() {
   const queryClient = useQueryClient();
 
   // Fetch messages
-  const { data: messages = [], isLoading } = useQuery<Message[]>({
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/messages', dmId],
     queryFn: async () => {
       const res = await fetch(`/api/messages?recipientId=${dmId}`);
@@ -32,6 +32,17 @@ export default function DMPage() {
       return res.json();
     },
     refetchInterval: 3000 // Poll every 3 seconds
+  });
+
+  // Fetch user data
+  const { data: userData, isLoading: userLoading } = useQuery({
+    queryKey: ['/api/users', dmId],
+    queryFn: async () => {
+      const res = await fetch(`/api/users/${dmId}`);
+      if (!res.ok) throw new Error('Failed to fetch user data');
+      return res.json();
+    },
+    enabled: !!dmId
   });
 
   // Send message mutation
@@ -68,13 +79,18 @@ export default function DMPage() {
     <div className="flex-1 flex flex-col h-full">
       <div className="border-b p-4 flex items-center gap-3">
         {dmId && (
-          //This section needs to fetch the DM data corresponding to dmId.  Since the mock data is gone,  this section will likely need a corresponding API call and state management. For now, leaving as is.  This is a placeholder and may require further adjustment.
           <>
-            {/* Placeholder until backend data fetching is implemented */}
+            <UserAvatar 
+              user={userData} 
+              className="h-10 w-10" 
+              interactive
+            />
             <div>
-              <h2 className="text-lg font-semibold">@{dmId}</h2>
+              <h2 className="text-lg font-semibold">
+                {userData?.displayName || userData?.username || 'Loading...'}
+              </h2>
               <p className="text-sm text-muted-foreground">
-                Loading...
+                {userData?.aboutMe || 'No bio available'}
               </p>
             </div>
           </>
@@ -82,26 +98,32 @@ export default function DMPage() {
       </div>
 
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className="flex gap-3">
-              <UserAvatar 
-                user={message.sender} 
-                className="h-8 w-8 flex-shrink-0" 
-                interactive
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium">{message.sender.displayName || message.sender.username}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(message.timestamp).toLocaleString()}
-                  </span>
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Loading messages...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <div key={message.id} className="flex gap-3">
+                <UserAvatar 
+                  user={message.sender} 
+                  className="h-8 w-8 flex-shrink-0" 
+                  interactive
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium">{message.sender.displayName || message.sender.username}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(message.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm">{message.content}</p>
                 </div>
-                <p className="text-sm">{message.content}</p>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </ScrollArea>
 
       <MessageInput onSend={handleSendMessage} />

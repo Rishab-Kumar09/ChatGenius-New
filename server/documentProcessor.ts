@@ -55,13 +55,14 @@ export async function processAllDocuments() {
     const files = fs.readdirSync(uploadsDir);
     
     for (const file of files) {
-      if (file.toLowerCase().endsWith('.pdf')) {
+      // Only process files that match the pattern YYYYltr.pdf (Berkshire letters)
+      if (file.match(/^\d{4}ltr\.pdf$/)) {
         const filePath = path.join(uploadsDir, file);
         await processDocument(filePath);
       }
     }
 
-    console.log("All documents processed successfully");
+    console.log("All Berkshire Hathaway letters processed successfully");
     return true;
   } catch (error) {
     console.error("Error processing documents:", error);

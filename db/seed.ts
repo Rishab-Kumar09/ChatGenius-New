@@ -1,6 +1,6 @@
 import { db } from "./index";
-import { channels, channelMembers, users } from "./schema";
-import { eq } from "drizzle-orm";
+import { users, channels, channelMembers } from "./schema";
+import { eq, and } from "drizzle-orm";
 import bcrypt from 'bcryptjs';
 
 export async function seedDatabase() {
@@ -24,7 +24,7 @@ export async function seedDatabase() {
           username: 'system',
           password: hashedPassword,
           displayName: 'System',
-          aboutMe: 'System user for managing default channels and system operations.',
+          aboutMe: 'System user for managing system operations.',
           avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=system'
         });
       console.log('Created system user');
@@ -48,84 +48,55 @@ export async function seedDatabase() {
         .values({
           username: 'ai-assistant',
           password: hashedPassword,
-          displayName: 'AI Assistant',
-          aboutMe: 'I am an AI assistant that helps users in the chat.',
+          displayName: "Warren's AI Assistant",
+          aboutMe: "I'm an AI assistant with knowledge from Berkshire Hathaway's annual letters. I can help you understand Warren Buffett's investment philosophy and Berkshire's history.",
           avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=ai-assistant'
         });
       console.log('Created AI bot user');
-    } else {
-      console.log('AI bot already exists');
     }
 
-    // Get system user ID
-    const [systemUser] = await db
+    // Get AI assistant user ID
+    const [aiAssistant] = await db
       .select()
       .from(users)
-      .where(eq(users.username, 'system'))
+      .where(eq(users.username, 'ai-assistant'))
       .limit(1)
       .all();
 
-    if (!systemUser) {
-      throw new Error('System user not found after creation');
+    if (!aiAssistant) {
+      throw new Error('AI assistant not found after creation');
     }
 
-    // Create default channels
-    const defaultChannels = [
-      {
-        name: "general",
-        description: "General discussion channel",
-        isPrivate: false,
-      },
-      {
-        name: "random",
-        description: "Random discussions and fun stuff",
-        isPrivate: false,
-      },
-      {
-        name: "announcements",
-        description: "Important announcements",
-        isPrivate: false,
-      }
-    ];
+    // Add AI assistant to all public channels
+    const publicChannels = await db
+      .select()
+      .from(channels)
+      .where(eq(channels.isPrivate, false))
+      .all();
 
-    // Insert or update channels
-    for (const channel of defaultChannels) {
-      try {
-        // Check if channel exists
-        const existingChannel = await db
-          .select()
-          .from(channels)
-          .where(eq(channels.name, channel.name))
-          .limit(1)
-          .all();
+    for (const channel of publicChannels) {
+      // Check if AI is already a member
+      const [membership] = await db
+        .select()
+        .from(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.channelId, channel.id),
+            eq(channelMembers.userId, aiAssistant.id)
+          )
+        )
+        .limit(1)
+        .all();
 
-        if (!existingChannel.length) {
-          // Create the channel
-          const [newChannel] = await db
-            .insert(channels)
-            .values({
-              name: channel.name,
-              description: channel.description,
-              isPrivate: channel.isPrivate,
-            })
-            .returning();
-
-          // Add system user as owner of default channels
-          await db
-            .insert(channelMembers)
-            .values({
-              channelId: newChannel.id,
-              userId: systemUser.id,
-              role: 'owner'
-            });
-
-          console.log(`Created channel: ${channel.name}`);
-        } else {
-          console.log(`Channel ${channel.name} already exists, skipping...`);
-        }
-      } catch (error) {
-        console.error(`Error creating channel ${channel.name}:`, error);
-        // Continue with other channels even if one fails
+      if (!membership) {
+        await db
+          .insert(channelMembers)
+          .values({
+            channelId: channel.id,
+            userId: aiAssistant.id,
+            role: 'member'
+          });
+        console.log(`Added AI assistant to channel: ${channel.name}`);
       }
     }
 
