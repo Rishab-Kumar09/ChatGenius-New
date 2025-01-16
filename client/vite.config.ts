@@ -1,10 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import themePlugin from "@replit/vite-plugin-shadcn-theme-json";
+import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), runtimeErrorOverlay(), themePlugin()],
+  css: {
+    postcss: './postcss.config.cjs'
+  },
   server: {
     port: 5173,
     host: true,
@@ -26,6 +31,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@db": path.resolve(__dirname, "../db"),
     },
   },
 }) 

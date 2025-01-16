@@ -10,6 +10,9 @@ const __dirname = dirname(__filename);
 
 export default defineConfig({
   plugins: [react(), runtimeErrorOverlay(), themePlugin()],
+  css: {
+    postcss: './postcss.config.js'
+  },
   resolve: {
     alias: {
       "@db": path.resolve(__dirname, "db"),
@@ -32,7 +35,7 @@ export default defineConfig({
     hmr: {
       protocol: 'ws',
       host: 'localhost',
-      port: 24678 // Vite's default HMR port
+      port: 24678
     },
   },
 });
