@@ -7,8 +7,8 @@ import path from 'path';
 import fs from 'fs';
 
 // Validate environment variables
-if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX_NAME) {
-  throw new Error('PINECONE_API_KEY and PINECONE_INDEX_NAME must be set in environment variables');
+if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
+  throw new Error('PINECONE_API_KEY and PINECONE_INDEX must be set in environment variables');
 }
 
 // Initialize Pinecone client
@@ -16,7 +16,7 @@ const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY
 });
 
-const index = pinecone.index(process.env.PINECONE_INDEX_NAME);
+const index = pinecone.index(process.env.PINECONE_INDEX);
 
 export async function processDocument(filePath: string) {
   try {

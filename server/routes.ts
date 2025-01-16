@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request as ExpressRequest, Response as ExpressResponse, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { messages, users, channels, channelMembers, channelInvitations, reactions, type SelectUser } from "../db/schema";
@@ -13,13 +13,13 @@ import type { IncomingMessage } from 'http';
 import { generateAIResponse, generateMessageSuggestions, generateQuickReplies } from "./ai";
 import { processDocument, processAllDocuments } from "./documentProcessor";
 
-// Extend Express Request type
-declare global {
-  namespace Express {
-    interface Request {
-      user?: SelectUser;
-    }
-  }
+// Extend Express types
+interface Request extends ExpressRequest {
+  user?: SelectUser;
+}
+
+interface Response extends ExpressResponse {
+  flush?: () => void;
 }
 
 // Extend WebSocket request type
@@ -50,8 +50,12 @@ interface SSEEvent {
   data: any;
 }
 
-// Keep track of connected SSE clients
+// Keep track of connected SSE clients and their last query times
 const clients = new Set<SSEClient>();
+const userQueryTimes = new Map<number, number>();
+
+// Rate limit for user queries (5 seconds)
+const USER_QUERY_RATE_LIMIT = 5000;
 
 // Keep track of WebSocket server state
 let isWsServerReady = false;
@@ -258,8 +262,62 @@ export function registerRoutes(app: Express): Server {
     });
   });
 
+  // Helper function to broadcast events to all connected clients with rate limiting
+  const broadcastEvent = (event: SSEEvent, excludeClient?: string) => {
+    if (!clients || clients.size === 0) {
+      console.log('No SSE clients connected, skipping broadcast');
+      return;
+    }
+
+    // Rate limit check for user queries
+    if (event.type === 'message' && event.data.sender?.id) {
+      const now = Date.now();
+      const lastQueryTime = userQueryTimes.get(event.data.sender.id) || 0;
+      
+      if (now - lastQueryTime < USER_QUERY_RATE_LIMIT) {
+        console.log('Rate limiting user query:', event.data.sender.id);
+        return;
+      }
+      
+      userQueryTimes.set(event.data.sender.id, now);
+    }
+
+    const eventString = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
+    const deadClients = new Set<SSEClient>();
+
+    clients.forEach(client => {
+      if (!client?.res?.write || client.res.writableEnded || !client.res.writable) {
+        deadClients.add(client);
+        return;
+      }
+
+      if (excludeClient && client.id === excludeClient) return;
+
+      try {
+        client.res.write(eventString);
+        client.res.flush?.(); // Flush the response if the method exists
+      } catch (error) {
+        console.error('Error broadcasting to SSE client:', error);
+        deadClients.add(client);
+      }
+    });
+
+    // Clean up dead clients
+    deadClients.forEach(client => {
+      try {
+        if (!client.res.writableEnded) {
+          client.res.end();
+        }
+        clients.delete(client);
+      } catch (error) {
+        console.error('Error cleaning up dead client:', error);
+      }
+    });
+  };
+
   // SSE endpoint for real-time updates
   app.get("/api/events", requireAuth, (req: Request, res: Response) => {
+    // Set appropriate headers for SSE
     const headers = {
       'Content-Type': 'text/event-stream',
       'Connection': 'keep-alive',
@@ -269,35 +327,68 @@ export function registerRoutes(app: Express): Server {
 
     res.writeHead(200, headers);
 
+    // Enable response streaming
+    if (res.flush) {
+      res.flush();
+    }
+
     // Helper function to send events to this client
     const sendEvent = (event: SSEEvent) => {
-      const eventString = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
-      res.write(eventString);
+      if (res.writableEnded || !res.writable) return;
+      try {
+        const eventString = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
+        res.write(eventString);
+        res.flush?.();
+      } catch (error) {
+        console.error('Error sending event to client:', error);
+        cleanup();
+      }
     };
 
     // Send initial connection event
     sendEvent({ type: 'connected', data: { userId: req.user?.id } });
 
     // Send initial ping
-    res.write(':\n\n');
+    if (!res.writableEnded && res.writable) {
+      res.write(':\n\n');
+      res.flush?.();
+    }
 
     // Keep connection alive with periodic pings
     const keepAlive = setInterval(() => {
-      if (res.writableEnded) {
-        clearInterval(keepAlive);
+      if (res.writableEnded || !res.writable) {
+        cleanup();
         return;
       }
-      res.write(':\n\n');
+      try {
+        res.write(':\n\n');
+        res.flush?.();
+      } catch (error) {
+        console.error('Error sending keepalive:', error);
+        cleanup();
+      }
     }, 30000);
 
     // Add client to connected clients
     const client: SSEClient = { id: req.user!.id.toString(), res };
     clients.add(client);
 
-    // Handle client disconnect
-    req.on('close', () => {
+    // Cleanup function
+    const cleanup = () => {
       clearInterval(keepAlive);
       clients.delete(client);
+      if (!res.writableEnded && res.writable) {
+        try {
+          res.end();
+        } catch (error) {
+          console.error('Error ending response:', error);
+        }
+      }
+    };
+
+    // Handle client disconnect
+    req.on('close', () => {
+      cleanup();
       broadcastEvent({
         type: 'presence',
         data: {
@@ -306,34 +397,18 @@ export function registerRoutes(app: Express): Server {
         }
       });
     });
-  });
 
-  // Helper function to broadcast events to all connected clients
-  const broadcastEvent = (event: SSEEvent, excludeClient?: string) => {
-    if (!clients || clients.size === 0) {
-      console.log('No SSE clients connected, skipping broadcast');
-      return;
-    }
-
-    const eventString = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
-
-    clients.forEach(client => {
-      if (!client?.res?.write) {
-        console.error('Invalid SSE client found, removing from set');
-        clients.delete(client);
-        return;
-      }
-
-      if (excludeClient && client.id === excludeClient) return;
-
-      try {
-        client.res.write(eventString);
-      } catch (error) {
-        console.error('Error broadcasting to SSE client:', error);
-        clients.delete(client);
-      }
+    // Handle errors
+    req.on('error', (error) => {
+      console.error('SSE request error:', error);
+      cleanup();
     });
-  };
+
+    res.on('error', (error) => {
+      console.error('SSE response error:', error);
+      cleanup();
+    });
+  });
 
   // Update presence status
   app.post("/api/presence", requireAuth, (req: Request, res: Response) => {
@@ -397,17 +472,30 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Message must contain either text content or a file" });
       }
 
-      // Check if recipient is AI assistant
-      const isAIRecipient = recipientId && await db
+      // Get AI assistant user
+      const [aiAssistant] = await db
         .select()
         .from(users)
-        .where(
-          and(
-            eq(users.id, parseInt(recipientId)),
-            eq(users.username, 'ai-assistant')
-          )
-        )
+        .where(eq(users.username, 'ai-assistant'))
         .limit(1);
+
+      if (!aiAssistant) {
+        console.error('AI assistant not found');
+        return res.status(500).json({ error: 'AI assistant not found' });
+      }
+
+      // Check if this is a DM to Sarah
+      const isAIDM = recipientId && recipientId === aiAssistant.id.toString();
+
+      // Check for mentions in content
+      const mentionRegex = /@([^@\n]+?)(?=\s|$)/g;
+      const mentions = content?.match(mentionRegex) || [];
+      const hasSarahMention = mentions.some((mention: string) => {
+        const mentionText = mention.slice(1).toLowerCase();
+        return mentionText === 'sarah thompson' || 
+               mentionText === 'sarah' || 
+               mentionText === 'ai-assistant';
+      });
 
       // Create message data
       const messageData = {
@@ -424,34 +512,19 @@ export function registerRoutes(app: Express): Server {
         })
       };
 
-      // Check for mentions in content
-      const mentionRegex = /@([^@\n]+?)(?=\s|$)/g;
-      const mentions = content?.match(mentionRegex) || [];
-      let aiAssistant = null;
-
-      if (mentions.length > 0) {
-        // Get AI assistant user
-        [aiAssistant] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, 'ai-assistant'))
-          .limit(1);
-      }
-
       // Insert user's message
       const [message] = await db
         .insert(messages)
         .values(messageData)
         .returning();
 
-      // If message mentions AI assistant, generate and send AI response
-      if (aiAssistant && mentions.some((mention: string) => {
-        const mentionText = mention.slice(1).toLowerCase(); // Remove @ and convert to lowercase
-        return mentionText === 'sarah thompson' || 
-               mentionText === 'sarah' || 
-               mentionText === 'ai-assistant';
-      })) {
+      // Generate AI response if:
+      // 1. Direct message to Sarah, or
+      // 2. Message mentions Sarah in a channel
+      if (isAIDM || hasSarahMention) {
+        console.log('Generating AI response for:', isAIDM ? 'DM' : 'mention');
         const aiResponse = await generateAIResponse(content, req.user!.id);
+
         const [aiMessage] = await db
           .insert(messages)
           .values({

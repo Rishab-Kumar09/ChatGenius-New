@@ -29,8 +29,18 @@
   * {
     @apply border-border;
   }
+}
 
-  body {
-    @apply bg-background text-foreground;
+@layer utilities {
+  .bg-background {
+    background-color: hsl(var(--background));
   }
+  
+  .text-foreground {
+    color: hsl(var(--foreground));
+  }
+}
+
+body {
+  @apply bg-background text-foreground;
 }

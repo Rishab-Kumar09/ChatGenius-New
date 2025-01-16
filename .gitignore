@@ -36,3 +36,7 @@ yarn-error.log*
 # Database
 *.db
 *.db-journal
+
+# Environment variables
+.env*
+!.env.example
