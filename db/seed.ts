@@ -36,7 +36,7 @@ export async function seedDatabase() {
     const existingBot = await db
       .select()
       .from(users)
-      .where(eq(users.username, 'ai-assistant'))
+      .where(eq(users.username, 'sarah'))
       .limit(1)
       .all();
 
@@ -46,20 +46,20 @@ export async function seedDatabase() {
       await db
         .insert(users)
         .values({
-          username: 'ai-assistant',
+          username: 'sarah',
           password: hashedPassword,
-          displayName: "Warren's AI Assistant",
-          aboutMe: "I'm an AI assistant with knowledge from Berkshire Hathaway's annual letters. I can help you understand Warren Buffett's investment philosophy and Berkshire's history.",
-          avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=ai-assistant'
+          displayName: "Sarah Thompson",
+          aboutMe: "Financial analyst with over 8 years of experience studying Berkshire Hathaway's investment strategies. I specialize in analyzing Warren Buffett's annual letters and helping others understand Berkshire's unique approach to value investing and business acquisitions.",
+          avatarUrl: 'https://api.dicebear.com/7.x/personas/svg?seed=sarah&backgroundColor=b6e3f4&clothing=blazer&clothingColor=17807c'
         });
-      console.log('Created AI bot user');
+      console.log('Created financial analyst profile');
     }
 
     // Get AI assistant user ID
     const [aiAssistant] = await db
       .select()
       .from(users)
-      .where(eq(users.username, 'ai-assistant'))
+      .where(eq(users.username, 'sarah'))
       .limit(1)
       .all();
 
