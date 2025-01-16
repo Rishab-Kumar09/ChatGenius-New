@@ -31,37 +31,12 @@ export async function seedDatabase() {
     
     console.log('Sarah created/updated with ID:', sarah.id);
 
-    // Create system user if needed
-    const [system] = await db
-      .insert(users)
-      .values({
-        username: 'system',
-        password: await bcrypt.hash('system-' + Date.now(), 10),
-        displayName: 'System',
-        aboutMe: 'System user for managing system operations.',
-        avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=system'
-      })
-      .onConflictDoUpdate({
-        target: users.username,
-        set: {
-          displayName: 'System',
-          aboutMe: 'System user for managing system operations.',
-          avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=system'
-        }
-      })
-      .returning();
-
-    // Get all users except system and Sarah
+    // Get all users except Sarah
     console.log('Finding users to send initial messages to...');
     const usersToMessage = await db
       .select()
       .from(users)
-      .where(
-        and(
-          not(eq(users.username, 'system')),
-          not(eq(users.username, 'ai-assistant'))
-        )
-      )
+      .where(not(eq(users.username, 'ai-assistant')))
       .all();
 
     console.log('Found users to message:', usersToMessage.map(u => `${u.username} (ID: ${u.id})`));

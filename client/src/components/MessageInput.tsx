@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from '@tanstack/react-query';
 import { Paperclip, Send } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 interface MessageInputProps {
   channelId?: string;
@@ -12,6 +13,12 @@ interface MessageInputProps {
   onReplyComplete?: () => void;
   placeholder?: string;
   onSend?: (content: string) => Promise<void>;
+}
+
+interface User {
+  id: number;
+  username: string;
+  displayName: string | null;
 }
 
 export function MessageInput({ 
@@ -24,9 +31,64 @@ export function MessageInput({
 }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState("");
+  const [mentionResults, setMentionResults] = useState<User[]>([]);
+  const [showMentions, setShowMentions] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleMentionSearch = useCallback(async (search: string) => {
+    try {
+      const response = await fetch(`/api/search?type=users&query=${encodeURIComponent(search)}`);
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const data = await response.json();
+      setMentionResults(data.users);
+    } catch (error) {
+      console.error('Failed to search users:', error);
+    }
+  }, []);
+
+  const insertMention = useCallback((user: User) => {
+    const beforeCursor = content.substring(0, cursorPosition);
+    const afterCursor = content.substring(cursorPosition);
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
+    const newContent = beforeCursor.substring(0, lastAtIndex) + 
+      `@${user.displayName || user.username} ` + 
+      afterCursor;
+    
+    setContent(newContent);
+    setShowMentions(false);
+    setMentionResults([]);
+    
+    // Set focus back to textarea
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const newCursorPos = lastAtIndex + (user.displayName || user.username).length + 2;
+      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+    }
+  }, [content, cursorPosition]);
+
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setContent(newContent);
+    setCursorPosition(e.target.selectionStart);
+
+    // Check for mention
+    const beforeCursor = newContent.substring(0, e.target.selectionStart);
+    const match = beforeCursor.match(/@(\w*)$/);
+    
+    if (match) {
+      setMentionSearch(match[1]);
+      setShowMentions(true);
+      handleMentionSearch(match[1]);
+    } else {
+      setShowMentions(false);
+      setMentionResults([]);
+    }
+  }, [handleMentionSearch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,13 +158,12 @@ export function MessageInput({
   }, [handleSubmit]);
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2 items-end">
+    <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2 items-end relative">
       <input
         type="file"
         ref={fileInputRef}
         className="hidden"
         onChange={() => {
-          // Trigger form submission when file is selected
           if (fileInputRef.current?.files?.length) {
             handleSubmit(new Event('submit') as any);
           }
@@ -116,13 +177,35 @@ export function MessageInput({
       >
         <Paperclip className="h-5 w-5" />
       </Button>
-      <Textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        onKeyPress={handleKeyPress}
-        placeholder={placeholder}
-        className="min-h-[60px] flex-1 resize-none"
-      />
+      <div className="flex-1 relative">
+        <Textarea
+          ref={textareaRef}
+          value={content}
+          onChange={handleContentChange}
+          onKeyPress={handleKeyPress}
+          placeholder={placeholder}
+          className="min-h-[60px] resize-none"
+        />
+        
+        {/* Mention suggestions */}
+        {showMentions && mentionResults.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-1 w-64 bg-background border rounded-lg shadow-lg overflow-hidden">
+            {mentionResults.map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2"
+                onClick={() => insertMention(user)}
+              >
+                <span className="font-medium">{user.displayName || user.username}</span>
+                {user.displayName && (
+                  <span className="text-sm text-muted-foreground">@{user.username}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <Button type="submit" size="icon" disabled={isLoading || (!content.trim() && !fileInputRef.current?.files?.length)}>
         <Send className="h-5 w-5" />
       </Button>

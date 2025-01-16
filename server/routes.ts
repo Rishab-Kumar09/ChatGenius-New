@@ -53,6 +53,9 @@ interface SSEEvent {
 // Keep track of connected SSE clients
 const clients = new Set<SSEClient>();
 
+// Keep track of WebSocket server state
+let isWsServerReady = false;
+
 // Auth middleware
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
@@ -71,6 +74,18 @@ export function registerRoutes(app: Express): Server {
   const wss = new WebSocketServer({ 
     noServer: true,
     perMessageDeflate: false
+  });
+
+  // Set server ready state when WebSocket server is initialized
+  wss.on('listening', () => {
+    console.log('WebSocket server is ready');
+    isWsServerReady = true;
+  });
+
+  // Reset state if WebSocket server closes
+  wss.on('close', () => {
+    console.log('WebSocket server closed');
+    isWsServerReady = false;
   });
 
   // Handle WebSocket upgrade
@@ -192,36 +207,45 @@ export function registerRoutes(app: Express): Server {
                   .leftJoin(users, eq(reactions.userId, users.id))
                   .where(eq(reactions.messageId, parseInt(messageId)));
 
-                // Immediate broadcast to all clients
-                const reactionUpdate = {
-                  type: 'reaction_update',
-                  data: {
-                    messageId: parseInt(messageId),
-                    reactions: updatedReactions.map(reaction => ({
-                      id: reaction.id,
-                      messageId: reaction.messageId,
-                      userId: reaction.userId,
-                      emoji: reaction.emoji,
-                      user: {
-                        id: reaction.userId,
-                        username: reaction.username,
-                        displayName: reaction.displayName
-                      }
-                    }))
-                  }
-                };
+                // Safe broadcast to all clients
+                if (isWsServerReady && wss.clients) {
+                  const reactionUpdate = {
+                    type: 'reaction_update',
+                    data: {
+                      messageId: parseInt(messageId),
+                      reactions: updatedReactions.map(reaction => ({
+                        id: reaction.id,
+                        messageId: reaction.messageId,
+                        userId: reaction.userId,
+                        emoji: reaction.emoji,
+                        user: {
+                          id: reaction.userId,
+                          username: reaction.username,
+                          displayName: reaction.displayName
+                        }
+                      }))
+                    }
+                  };
 
-                wss.clients.forEach(client => {
-                  if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify(reactionUpdate));
-                  }
-                });
+                  wss.clients.forEach(client => {
+                    if (client?.readyState === WebSocket.OPEN) {
+                      try {
+                        client.send(JSON.stringify(reactionUpdate));
+                      } catch (err) {
+                        console.error('Error sending to client:', err);
+                      }
+                    }
+                  });
+                }
               });
             } catch (error) {
-              ws.send(JSON.stringify({
-                type: 'error',
-                data: { message: 'Failed to update reaction' }
-              }));
+              console.error('Transaction error:', error);
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                  type: 'error',
+                  data: { message: 'Failed to update reaction' }
+                }));
+              }
             }
             break;
 
@@ -286,15 +310,26 @@ export function registerRoutes(app: Express): Server {
 
   // Helper function to broadcast events to all connected clients
   const broadcastEvent = (event: SSEEvent, excludeClient?: string) => {
+    if (!clients || clients.size === 0) {
+      console.log('No SSE clients connected, skipping broadcast');
+      return;
+    }
+
     const eventString = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
 
     clients.forEach(client => {
+      if (!client?.res?.write) {
+        console.error('Invalid SSE client found, removing from set');
+        clients.delete(client);
+        return;
+      }
+
       if (excludeClient && client.id === excludeClient) return;
 
       try {
         client.res.write(eventString);
       } catch (error) {
-        console.error('Error broadcasting to client:', error);
+        console.error('Error broadcasting to SSE client:', error);
         clients.delete(client);
       }
     });
@@ -389,21 +424,41 @@ export function registerRoutes(app: Express): Server {
         })
       };
 
+      // Check for mentions in content
+      const mentionRegex = /@([^@\n]+?)(?=\s|$)/g;
+      const mentions = content?.match(mentionRegex) || [];
+      let aiAssistant = null;
+
+      if (mentions.length > 0) {
+        // Get AI assistant user
+        [aiAssistant] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, 'ai-assistant'))
+          .limit(1);
+      }
+
       // Insert user's message
       const [message] = await db
         .insert(messages)
         .values(messageData)
         .returning();
 
-      // If recipient is AI, generate and send AI response
-      if (isAIRecipient?.length > 0) {
-        const aiResponse = await generateAIResponse(content);
+      // If message mentions AI assistant, generate and send AI response
+      if (aiAssistant && mentions.some((mention: string) => {
+        const mentionText = mention.slice(1).toLowerCase(); // Remove @ and convert to lowercase
+        return mentionText === 'sarah thompson' || 
+               mentionText === 'sarah' || 
+               mentionText === 'ai-assistant';
+      })) {
+        const aiResponse = await generateAIResponse(content, req.user!.id);
         const [aiMessage] = await db
           .insert(messages)
           .values({
             content: aiResponse,
-            senderId: isAIRecipient[0].id,
-            recipientId: req.user!.id,
+            senderId: aiAssistant.id,
+            channelId: channelId ? parseInt(channelId) : null,
+            recipientId: channelId ? null : req.user!.id,
           })
           .returning();
 
@@ -428,6 +483,7 @@ export function registerRoutes(app: Express): Server {
           data: {
             id: formattedAIMessage.message.id,
             content: formattedAIMessage.message.content,
+            channelId: formattedAIMessage.message.channelId,
             recipientId: formattedAIMessage.message.recipientId,
             timestamp: formattedAIMessage.message.createdAt,
             sender: formattedAIMessage.sender
@@ -884,7 +940,7 @@ export function registerRoutes(app: Express): Server {
           .where(
             and(
               sql`(LOWER(username) LIKE LOWER(${`%${query}%`}) OR LOWER(display_name) LIKE LOWER(${`%${query}%`}))`,
-              sql`id != ${currentUserId}`
+              ne(users.id, currentUserId) // Only exclude current user, allow ai-assistant
             )
           )
           .limit(10);
@@ -899,7 +955,7 @@ export function registerRoutes(app: Express): Server {
         .where(
           and(
             sql`(LOWER(username) LIKE LOWER(${`%${query}%`}) OR LOWER(display_name) LIKE LOWER(${`%${query}%`}))`,
-            sql`id != ${currentUserId}`
+            ne(users.id, currentUserId) // Only exclude current user, allow ai-assistant
           )
         )
         .limit(5);

@@ -107,7 +107,14 @@ export function Message({ message, isLastInGroup }: MessageProps) {
         
         <div>
           {message.content && (
-            <p className="text-white/90">{message.content}</p>
+            <p className="text-white/90">
+              {message.content.split(/(@[\w\s-]+)/).map((part, i) => {
+                if (part.startsWith('@')) {
+                  return <span key={i} className="text-indigo-400 bg-indigo-400/10 hover:bg-indigo-400/20 px-2 py-0.5 rounded-md cursor-pointer transition-colors">{part}</span>;
+                }
+                return part;
+              })}
+            </p>
           )}
           {message.fileUrl && renderFileContent()}
         </div>
