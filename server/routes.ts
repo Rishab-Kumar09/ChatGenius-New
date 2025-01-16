@@ -531,6 +531,7 @@ export function registerRoutes(app: Express): Server {
             senderId: aiAssistant.id,
             channelId: channelId ? parseInt(channelId) : null,
             recipientId: isAIDM ? req.user!.id : null,
+            parentId: message.id  // Set the parentId to the original message ID
           })
           .returning();
 
@@ -2015,7 +2016,7 @@ export function registerRoutes(app: Express): Server {
   // AI chat endpoint
   app.post("/api/ai/chat", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { content, channelId } = req.body;
+      const { content, channelId, parentId } = req.body;
       
       // Get AI bot user
       const [aiBot] = await db
@@ -2039,6 +2040,7 @@ export function registerRoutes(app: Express): Server {
           senderId: aiBot.id,
           channelId: channelId ? parseInt(channelId) : null,
           recipientId: req.user!.id,
+          parentId: parentId ? parseInt(parentId) : null
         })
         .returning();
 
