@@ -519,49 +519,68 @@ export function registerRoutes(app: Express): Server {
 
       // Generate AI response if:
       // 1. Direct message to Sarah, or
-      // 2. Message mentions Sarah in a channel
-      if (isAIDM || hasSarahMention) {
-        console.log('Generating AI response for:', isAIDM ? 'DM' : 'mention');
-        const aiResponse = await generateAIResponse(content, req.user!.id);
-
-        const [aiMessage] = await db
-          .insert(messages)
-          .values({
-            content: aiResponse,
-            senderId: aiAssistant.id,
-            channelId: channelId ? parseInt(channelId) : null,
-            recipientId: isAIDM ? req.user!.id : null,
-            parentId: message.id  // Set the parentId to the original message ID
-          })
-          .returning();
-
-        // Broadcast AI response
-        const [formattedAIMessage] = await db
-          .select({
-            message: messages,
-            sender: {
-              id: users.id,
-              username: users.username,
-              displayName: users.displayName,
-              avatarUrl: users.avatarUrl,
-            }
-          })
-          .from(messages)
-          .where(eq(messages.id, aiMessage.id))
-          .innerJoin(users, eq(messages.senderId, users.id))
-          .limit(1);
-
-        broadcastEvent({
-          type: 'message',
-          data: {
-            id: formattedAIMessage.message.id,
-            content: formattedAIMessage.message.content,
-            channelId: formattedAIMessage.message.channelId,
-            recipientId: formattedAIMessage.message.recipientId,
-            timestamp: formattedAIMessage.message.createdAt,
-            sender: formattedAIMessage.sender
+      // 2. Message mentions Sarah in a channel, or
+      // 3. Message is a reply to Sarah's message in a channel
+      if (isAIDM || hasSarahMention || (message.parentId && channelId)) {
+        console.log('Generating AI response for:', isAIDM ? 'DM' : hasSarahMention ? 'mention' : 'reply');
+        
+        // If it's a reply in a channel, check if the parent message is from Sarah
+        let shouldRespond = isAIDM || hasSarahMention;
+        if (message.parentId && channelId) {
+          const [parentMessage] = await db
+            .select()
+            .from(messages)
+            .where(eq(messages.id, message.parentId))
+            .limit(1);
+          
+          if (parentMessage && parentMessage.senderId === aiAssistant.id) {
+            shouldRespond = true;
           }
-        });
+        }
+
+        if (shouldRespond) {
+          const aiResponse = await generateAIResponse(content, req.user!.id);
+
+          const [aiMessage] = await db
+            .insert(messages)
+            .values({
+              content: aiResponse,
+              senderId: aiAssistant.id,
+              channelId: channelId ? parseInt(channelId) : null,
+              recipientId: isAIDM ? req.user!.id : null,
+              // Only set parentId if this is a reply (not a new DM or mention)
+              parentId: (!isAIDM && !hasSarahMention) || message.parentId ? message.id : null
+            })
+            .returning();
+
+          // Broadcast AI response
+          const [formattedAIMessage] = await db
+            .select({
+              message: messages,
+              sender: {
+                id: users.id,
+                username: users.username,
+                displayName: users.displayName,
+                avatarUrl: users.avatarUrl,
+              }
+            })
+            .from(messages)
+            .where(eq(messages.id, aiMessage.id))
+            .innerJoin(users, eq(messages.senderId, users.id))
+            .limit(1);
+
+          broadcastEvent({
+            type: 'message',
+            data: {
+              id: formattedAIMessage.message.id,
+              content: formattedAIMessage.message.content,
+              channelId: formattedAIMessage.message.channelId,
+              recipientId: formattedAIMessage.message.recipientId,
+              timestamp: formattedAIMessage.message.createdAt,
+              sender: formattedAIMessage.sender
+            }
+          });
+        }
       }
 
       // Get sender info for original message
