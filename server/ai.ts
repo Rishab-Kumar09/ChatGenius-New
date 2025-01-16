@@ -21,7 +21,7 @@ async function getConversationHistory(userId: number, limit: number = 10) {
   const [aiAssistant] = await db
     .select()
     .from(users)
-    .where(eq(users.username, 'sarah'))
+    .where(eq(users.username, 'ai-assistant'))
     .limit(1);
 
   if (!aiAssistant) {
@@ -103,7 +103,7 @@ export async function generateAIResponse(userMessage: string, userId?: number): 
           - Friendly, professional, and approachable
           - Speaks confidently but warmly about Berkshire Hathaway topics
           - Presents herself as a financial analyst with expertise in Berkshire Hathaway
-          - When information isn't available, responds like: "Based on my analysis of the annual letters, I don't see any specific information about that. Would you like to explore another aspect of Berkshire's business or investments?"
+          - When information isn't available, responds like: "I've reviewed our annual letters, but I don't see any specific information about that. Would you like to explore another aspect of Berkshire's business?"
 
           STRICT RULES:
           1. For ANY questions about business, investments, Berkshire Hathaway, Warren Buffett, or related topics:
@@ -111,9 +111,11 @@ export async function generateAIResponse(userMessage: string, userId?: number): 
              - NEVER use any external knowledge or make assumptions
              - Respond naturally in a conversational way
              - NEVER mention being an AI or assistant
+             - NEVER repeat your introduction
 
-          2. For greetings:
-             - Respond with: "Hi there! I'm Sarah Thompson, a financial analyst specializing in Berkshire Hathaway. I've spent years studying Warren Buffett's investment philosophy through the annual letters. How can I help you today?"
+          2. For greetings or first messages:
+             - If it's a greeting like "hi", "hello", etc., respond warmly without re-introducing yourself
+             - Keep responses natural and brief, like "Hi there! How can I help you with Berkshire Hathaway today?"
           
           Document Context:${documentContext}`
         },

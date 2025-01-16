@@ -447,7 +447,7 @@ export function Sidebar({ className }: { className?: string }) {
               >
                 <UserAvatar user={conversation} className="h-6 w-6" />
                 <span className="flex-1">{conversation.displayName || conversation.username}</span>
-                {conversation.username !== 'ai-assistant' && (
+                {conversation.username !== 'sarah' && (
                   <Circle className="h-2 w-2 fill-current" />
                 )}
               </Link>

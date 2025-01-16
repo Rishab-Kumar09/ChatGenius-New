@@ -5,7 +5,7 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema, type SelectUser } from "@db/schema";
+import { users, insertUserSchema, type SelectUser, messages } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
 
@@ -136,6 +136,27 @@ export function setupAuth(app: Express) {
           email,
         })
         .returning();
+
+      // Get Sarah's user ID
+      const [sarah] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, 'ai-assistant'))
+        .limit(1);
+
+      if (sarah) {
+        console.log('Sending initial message from Sarah to new user:', newUser.username);
+        // Send initial message from Sarah
+        await db
+          .insert(messages)
+          .values({
+            content: "Hi! I'm Sarah Thompson, a financial analyst specializing in Berkshire Hathaway. I've spent years studying Warren Buffett's investment philosophy through the annual letters. I'd be happy to help you understand Berkshire's business and investment strategies - just ask me anything!",
+            senderId: sarah.id,
+            recipientId: newUser.id
+          })
+          .returning();
+        console.log('Initial message sent successfully');
+      }
 
       // Log the user in after registration
       req.login(newUser, (err) => {

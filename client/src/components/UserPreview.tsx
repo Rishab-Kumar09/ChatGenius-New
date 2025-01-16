@@ -36,7 +36,7 @@ export function UserPreview({ user, status = 'offline', children }: UserPreviewP
           <div className="space-y-1 flex-1">
             <div className="flex items-center gap-2">
               <span className="font-medium">{user.displayName || user.username}</span>
-              {user.username !== 'ai-assistant' && (
+              {user.username !== 'sarah' && (
                 <Circle className={cn(
                   "h-2 w-2",
                   status === 'online' && "fill-green-500 text-green-500",
