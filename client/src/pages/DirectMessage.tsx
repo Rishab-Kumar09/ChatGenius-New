@@ -219,9 +219,7 @@ export function DirectMessage() {
             <p className="text-sm text-muted-foreground">{userStatus}</p>
           </div>
         </div>
-        {recipientUser.username === 'ai-assistant' && (
-          <DocumentUpload />
-        )}
+        {/* DocumentUpload component hidden but functionality preserved */}
       </div>
 
       <div className="flex-1 relative">
