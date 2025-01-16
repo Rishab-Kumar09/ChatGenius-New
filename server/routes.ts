@@ -11,7 +11,7 @@ import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'http';
 import { generateAIResponse, generateMessageSuggestions, generateQuickReplies } from "./ai";
-import { processDocument } from "./documentProcessor";
+import { processDocument, processAllDocuments } from "./documentProcessor";
 
 // Extend Express Request type
 declare global {
@@ -1987,6 +1987,18 @@ export function registerRoutes(app: Express): Server {
       res.json({ message: "All documents processed successfully" });
     } catch (error) {
       console.error("Error processing documents:", error);
+      res.status(500).json({ error: "Failed to process documents" });
+    }
+  });
+
+  // Document processing endpoint
+  app.post("/api/documents/process", requireAuth, async (req: Request, res: Response) => {
+    try {
+      console.log('Starting document processing...');
+      await processAllDocuments();
+      res.json({ message: "Documents processed successfully" });
+    } catch (error) {
+      console.error('Error processing documents:', error);
       res.status(500).json({ error: "Failed to process documents" });
     }
   });

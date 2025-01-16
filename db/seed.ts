@@ -7,6 +7,31 @@ export async function seedDatabase() {
   try {
     console.log('Starting database seeding...');
 
+    // Create system user if it doesn't exist
+    const existingSystem = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, 'system'))
+      .limit(1)
+      .all();
+
+    if (!existingSystem.length) {
+      console.log('System user not found, creating...');
+      const hashedPassword = await bcrypt.hash('system-' + Date.now(), 10);
+      await db
+        .insert(users)
+        .values({
+          username: 'system',
+          password: hashedPassword,
+          displayName: 'System',
+          aboutMe: 'System user for managing default channels and system operations.',
+          avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=system'
+        });
+      console.log('Created system user');
+    } else {
+      console.log('System user already exists');
+    }
+
     // Create AI bot user if it doesn't exist
     const existingBot = await db
       .select()
@@ -30,6 +55,18 @@ export async function seedDatabase() {
       console.log('Created AI bot user');
     } else {
       console.log('AI bot already exists');
+    }
+
+    // Get system user ID
+    const [systemUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, 'system'))
+      .limit(1)
+      .all();
+
+    if (!systemUser) {
+      throw new Error('System user not found after creation');
     }
 
     // Create default channels
@@ -78,7 +115,7 @@ export async function seedDatabase() {
             .insert(channelMembers)
             .values({
               channelId: newChannel.id,
-              userId: 1, // System user ID
+              userId: systemUser.id,
               role: 'owner'
             });
 

@@ -1,9 +1,11 @@
 import OpenAI from "openai";
 import { messages } from "@db/schema";
 import { db } from "@db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, or, and } from "drizzle-orm";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { queryDocument } from "./documentProcessor";
+import { users } from "@db/schema";
+import { Document } from "@langchain/core/documents";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY environment variable is not set");
@@ -15,6 +17,19 @@ type Role = "system" | "user" | "assistant";
 
 // Function to get conversation history
 async function getConversationHistory(userId: number, limit: number = 10) {
+  // Get AI assistant user ID
+  const [aiAssistant] = await db
+    .select()
+    .from(users)
+    .where(eq(users.username, 'ai-assistant'))
+    .limit(1);
+
+  if (!aiAssistant) {
+    console.error('AI assistant user not found');
+    return [];
+  }
+
+  // Get conversation history between user and AI assistant
   const history = await db
     .select({
       content: messages.content,
@@ -22,7 +37,16 @@ async function getConversationHistory(userId: number, limit: number = 10) {
     })
     .from(messages)
     .where(
-      eq(messages.recipientId, userId)
+      or(
+        and(
+          eq(messages.senderId, userId),
+          eq(messages.recipientId, aiAssistant.id)
+        ),
+        and(
+          eq(messages.senderId, aiAssistant.id),
+          eq(messages.recipientId, userId)
+        )
+      )
     )
     .orderBy(desc(messages.createdAt))
     .limit(limit);
@@ -32,37 +56,107 @@ async function getConversationHistory(userId: number, limit: number = 10) {
 
 export async function generateAIResponse(userMessage: string, userId?: number): Promise<string> {
   try {
-    // Use queryDocument to get relevant documents
-    const documents = await queryDocument(userMessage);
+    console.log('Generating AI response for message:', userMessage);
     
-    if (!documents || documents.length === 0) {
-      return "I couldn't find any relevant information in the uploaded documents.";
+    // Get conversation history if userId is provided
+    let conversationHistory: any[] = [];
+    if (userId) {
+      try {
+        conversationHistory = await getConversationHistory(userId);
+        console.log('Retrieved conversation history:', conversationHistory.length, 'messages');
+      } catch (error) {
+        console.error('Error getting conversation history:', error);
+        // Continue without history rather than failing
+      }
     }
 
-    // Create a context from the relevant documents
-    const context = documents.map(doc => doc.pageContent).join('\n\n');
+    // Query relevant documents
+    let contextDocs: Document[] = [];
+    try {
+      contextDocs = await queryDocument(userMessage);
+      console.log('Retrieved relevant documents:', contextDocs.length);
+    } catch (error) {
+      console.error('Error querying documents:', error);
+      // Continue without documents rather than failing
+    }
 
-    // Generate a response using the context
+    // Format conversation history
+    const historyMessages: ChatCompletionMessageParam[] = conversationHistory.map(msg => ({
+      role: msg.senderId === userId ? "user" : "assistant" as Role,
+      content: msg.content
+    }));
+
+    // Prepare context from documents
+    const documentContext = contextDocs.length > 0 
+      ? "\nRelevant information from documents:\n" + contextDocs.map(doc => doc.pageContent).join("\n")
+      : "";
+
+    console.log('Making OpenAI API call');
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that answers questions based on the provided documents. Use only the information from the documents to answer questions."
+          content: `You are an AI assistant that ONLY responds with information found in the provided documents.
+          IMPORTANT RULES:
+          1. ONLY use information from the document context provided below.
+          2. If no relevant information is found in the documents, respond with "I don't have any information about that in my documents."
+          3. DO NOT provide general knowledge or information not found in the documents.
+          4. When answering, cite the specific parts of the documents you are using.
+          5. Never make up or infer information that isn't explicitly stated in the documents.
+          
+          Document Context:${documentContext}`
         },
+        ...historyMessages,
         {
           role: "user",
-          content: `Context from documents:\n${context}\n\nQuestion: ${userMessage}\n\nAnswer:`
+          content: userMessage
         }
       ],
-      temperature: 0.7,
-      max_tokens: 500
+      temperature: 0.3,
+      max_tokens: 500,
+      presence_penalty: 0.0,
+      frequency_penalty: 0.0
     });
 
-    return response.choices[0].message.content || "I apologize, but I couldn't generate a response based on the documents.";
-  } catch (error) {
+    const aiResponse = response.choices[0].message.content;
+    if (!aiResponse) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    console.log('Successfully generated AI response');
+    return aiResponse;
+
+  } catch (error: any) {
     console.error('Error generating AI response:', error);
-    return "I apologize, but I'm having trouble processing your message right now.";
+    
+    // Handle specific error cases
+    if (error?.response?.status === 429) {
+      return "I'm currently handling too many requests. Please try again in a moment.";
+    }
+    
+    if (error?.response?.status === 401 || error?.response?.status === 403) {
+      console.error('API Key Error:', {
+        key: process.env.OPENAI_API_KEY?.substring(0, 7) + '...',
+        length: process.env.OPENAI_API_KEY?.length,
+        error: error.message
+      });
+      return "There seems to be an issue with the API key configuration. Please ensure you have a valid OpenAI API key that starts with 'sk-' and is approximately 51 characters long.";
+    }
+
+    if (error?.message?.includes('Empty response')) {
+      return "I apologize, but I couldn't generate a meaningful response. Please try rephrasing your question.";
+    }
+    
+    // Log the full error for debugging
+    console.error('Detailed error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response,
+      cause: error.cause
+    });
+    
+    return `I apologize, but I'm having trouble processing your message right now. Error: ${error.message}`;
   }
 }
 
