@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configure upload directories
-const uploadDir = path.join(process.env.HOME || process.cwd(), '.data', 'uploads');
+const uploadDir = path.join(process.cwd(), 'data', 'uploads');
 const avatarDir = path.join(uploadDir, 'avatars');
 
 // Configure multer storage
@@ -48,27 +48,27 @@ async function startServer() {
   fs.mkdirSync(uploadDir, { recursive: true });
   fs.mkdirSync(avatarDir, { recursive: true });
 
-  // Serve static files from uploads directory
-  app.use('/uploads', express.static(uploadDir));
-  app.use('/uploads/avatars', express.static(avatarDir));
-
   // Initialize database and create tables
   await initializeDatabase();
 
   // Run database seeding
   await seedDatabase();
 
-  // Register API routes and get HTTP server instance
-  const server = registerRoutes(app);
+  // Serve static files from uploads directory
+  app.use('/uploads', express.static(uploadDir));
+  app.use('/uploads/avatars', express.static(avatarDir));
 
   // Serve static files from the client build directory
   const clientDistPath = path.join(__dirname, '../dist/public');
   app.use(express.static(clientDistPath));
 
+  // Register API routes and get HTTP server instance
+  const server = registerRoutes(app);
+
   // Handle client-side routing - serve index.html for all non-API routes
   app.get('*', (req, res) => {
     // Don't handle API routes
-    if (req.url.startsWith('/api/') || req.url.startsWith('/uploads/')) {
+    if (req.url.startsWith('/api/')) {
       return res.status(404).send('Not found');
     }
     res.sendFile(path.join(clientDistPath, 'index.html'));

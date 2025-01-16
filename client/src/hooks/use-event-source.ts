@@ -127,6 +127,15 @@ export function useEventSource() {
         }
       });
 
+      eventSource.addEventListener('profile_update', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setLastEvent({ type: 'profile_update', data });
+        } catch (error) {
+          console.error('Failed to parse profile update:', error);
+        }
+      });
+
       eventSource.addEventListener('message_deleted', (event) => {
         try {
           const data = JSON.parse(event.data);

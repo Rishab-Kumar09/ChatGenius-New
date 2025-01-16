@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useEventSource } from "@/hooks/use-event-source";
 
 export function ProfilePage() {
   const { user } = useUser();
@@ -23,6 +24,15 @@ export function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Listen for profile updates via SSE
+  const { lastEvent } = useEventSource();
+  useEffect(() => {
+    if (lastEvent?.type === 'profile_update' && lastEvent.data.userId === user?.id) {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      setAvatarKey(Date.now());
+    }
+  }, [lastEvent, user?.id, queryClient]);
 
   useEffect(() => {
     if (user) {
@@ -61,17 +71,18 @@ export function ProfilePage() {
         throw new Error(await response.text());
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      const data = await response.json();
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       setAvatarKey(Date.now());
       toast({
         title: "Success",
-        description: "Avatar updated successfully",
+        description: `Avatar updated successfully. URL: ${data.avatarUrl}`,
       });
     } catch (error) {
       console.error("Failed to update avatar:", error);
       toast({
         title: "Error",
-        description: "Failed to update avatar",
+        description: `Failed to update avatar: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
         variant: "destructive",
       });
     }

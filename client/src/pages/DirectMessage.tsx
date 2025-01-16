@@ -106,7 +106,7 @@ export function DirectMessage() {
 
       // Refetch messages
       await queryClient.invalidateQueries({ 
-        queryKey: [`/api/messages?recipientId=${id}`]
+        queryKey: ['/api/messages', id]
       });
 
       // Invalidate conversations to update sidebar
@@ -242,6 +242,8 @@ export function DirectMessage() {
           <MessageInput 
             recipientId={id}
             placeholder="Type a message..."
+            parentId={replyingTo?.id}
+            onReplyComplete={() => setReplyingTo(null)}
           />
         </div>
       </div>

@@ -40,6 +40,13 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Focus textarea when replying to a message
+  useEffect(() => {
+    if (parentId && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [parentId]);
+
   const handleMentionSearch = useCallback(async (search: string) => {
     try {
       const response = await fetch(`/api/search?type=users&query=${encodeURIComponent(search)}`);

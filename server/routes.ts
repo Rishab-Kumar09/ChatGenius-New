@@ -43,7 +43,8 @@ type SSEEventType =
   | 'connected'
   | 'conversation_update'
   | 'message_deleted'
-  | 'reaction_update';
+  | 'reaction_update'
+  | 'profile_update';
 
 interface SSEEvent {
   type: SSEEventType;
@@ -458,7 +459,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Serve uploaded files
-  app.use('/uploads', express.static(path.join(process.env.HOME || process.cwd(), '.data', 'uploads')));
+  app.use('/uploads', express.static(path.join(process.cwd(), 'data', 'uploads')));
 
   // Add file upload to messages endpoint
   app.post("/api/messages", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
@@ -793,6 +794,15 @@ export function registerRoutes(app: Express): Server {
         .update(users)
         .set({ avatarUrl })
         .where(eq(users.id, req.user!.id));
+
+      // Broadcast profile update event
+      broadcastEvent({
+        type: 'profile_update',
+        data: {
+          userId: req.user!.id,
+          avatarUrl
+        }
+      });
 
       // Return the full URL for immediate use
       res.json({ 
