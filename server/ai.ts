@@ -62,6 +62,12 @@ export async function generateAIResponse(userMessage: string, userId?: number): 
   try {
     console.log('Generating AI response for message:', userMessage);
     
+    // Check for introduction request
+    const introRegex = /@sarah\s+(?:thompson\s+)?introduce\s+yourself/i;
+    if (introRegex.test(userMessage)) {
+      return "Hi! I'm Sarah Thompson, a financial analyst specializing in Berkshire Hathaway. I've spent years studying Warren Buffett's investment philosophy through the annual letters. I'd be happy to help you understand Berkshire's business and investment strategies - just ask me anything!";
+    }
+    
     // Get conversation history if userId is provided
     let conversationHistory: any[] = [];
     if (userId) {

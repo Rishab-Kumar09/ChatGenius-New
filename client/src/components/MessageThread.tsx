@@ -49,6 +49,10 @@ export function MessageThread({
   onReaction,
   onDelete,
 }: MessageThreadProps) {
+  if (!messages || messages.length === 0) {
+    return <div className="flex-1 p-4 text-center text-muted-foreground">No messages yet</div>;
+  }
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
