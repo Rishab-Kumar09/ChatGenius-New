@@ -1,12 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import themePlugin from "@replit/vite-plugin-shadcn-theme-json";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), runtimeErrorOverlay(), themePlugin()],
+  plugins: [react(), runtimeErrorOverlay()],
   css: {
     postcss: './postcss.config.cjs'
   },
@@ -36,8 +35,20 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../dist/public',
-    emptyOutDir: true
+    outDir: process.env.AWS_LAMBDA_FUNCTION_VERSION 
+      ? '/opt/nodejs/dist/public'
+      : process.env.RENDER 
+        ? path.join(process.env.RENDER_PROJECT_DIR || '', 'dist/public')
+        : '../dist/public',
+    emptyOutDir: true,
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]'
+      }
+    }
   },
   resolve: {
     alias: {
