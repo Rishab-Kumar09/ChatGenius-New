@@ -30,6 +30,8 @@ async function startServer() {
       clientDistPath = '/opt/nodejs/dist/public';
     } else if (process.env.RENDER) {
       clientDistPath = path.join(process.env.RENDER_PROJECT_DIR || '', 'dist/public');
+    } else if (process.env.REPL_ID) {
+      clientDistPath = path.join(process.env.REPL_HOME || '', 'dist/public');
     } else {
       clientDistPath = path.join(__dirname, '../dist/public');
     }
@@ -37,7 +39,16 @@ async function startServer() {
     clientDistPath = path.join(__dirname, '../dist/public');
   }
 
-  console.log('Serving static files from:', clientDistPath);
+  console.log('Environment variables:', {
+    NODE_ENV: process.env.NODE_ENV,
+    AWS_LAMBDA_FUNCTION_VERSION: process.env.AWS_LAMBDA_FUNCTION_VERSION,
+    RENDER: process.env.RENDER,
+    RENDER_PROJECT_DIR: process.env.RENDER_PROJECT_DIR,
+    REPL_ID: process.env.REPL_ID,
+    REPL_HOME: process.env.REPL_HOME
+  });
+  
+  console.log('Initial static files path:', clientDistPath);
 
   // Check if the directory exists
   if (!fs.existsSync(clientDistPath)) {
@@ -47,13 +58,24 @@ async function startServer() {
       path.join(__dirname, './public'),
       path.join(process.cwd(), 'dist/public'),
       path.join(process.cwd(), 'public'),
-      // AWS Amplify possible paths
+      // AWS Amplify paths
       '/opt/nodejs/dist/public',
       '/var/task/dist/public',
       path.join(process.env.LAMBDA_TASK_ROOT || '', 'dist/public'),
+      // Render paths
+      path.join(process.env.RENDER_PROJECT_DIR || '', 'dist/public'),
+      path.join(process.env.RENDER_PROJECT_DIR || '', 'public'),
+      // Replit paths
+      path.join(process.env.REPL_HOME || '', 'dist/public'),
+      path.join(process.env.REPL_HOME || '', 'public'),
+      // Additional common paths
+      path.resolve(__dirname, '../client/dist'),
+      path.resolve(__dirname, '../public'),
+      path.resolve(process.cwd(), 'client/dist'),
     ];
 
     for (const altPath of altPaths) {
+      console.log('Checking path:', altPath);
       if (fs.existsSync(altPath)) {
         console.log('Found alternative static files directory:', altPath);
         clientDistPath = altPath;
@@ -68,6 +90,14 @@ async function startServer() {
     etag: true,
     lastModified: true,
     setHeaders: (res, path) => {
+      // Set proper MIME types
+      if (path.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (path.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+      
+      // Set caching headers
       if (path.endsWith('.html')) {
         res.setHeader('Cache-Control', 'no-cache');
       } else if (path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
@@ -87,8 +117,10 @@ async function startServer() {
     }
     
     const indexPath = path.join(clientDistPath, 'index.html');
+    console.log('Attempting to serve index.html from:', indexPath);
+    
     if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
+      res.sendFile(indexPath, { root: '/' });
     } else {
       console.error('index.html not found at:', indexPath);
       res.status(404).send('Application files not found');
@@ -100,7 +132,13 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log('Environment:', process.env.NODE_ENV);
-    console.log('Platform:', process.env.AWS_LAMBDA_FUNCTION_VERSION ? 'AWS' : process.env.RENDER ? 'Render' : 'Other');
+    console.log('Platform:', 
+      process.env.AWS_LAMBDA_FUNCTION_VERSION ? 'AWS' : 
+      process.env.RENDER ? 'Render' : 
+      process.env.REPL_ID ? 'Replit' : 
+      'Other'
+    );
+    console.log('Static files being served from:', clientDistPath);
   });
 }
 

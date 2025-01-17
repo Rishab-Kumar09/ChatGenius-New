@@ -39,7 +39,9 @@ export default defineConfig({
       ? '/opt/nodejs/dist/public'
       : process.env.RENDER 
         ? path.join(process.env.RENDER_PROJECT_DIR || '', 'dist/public')
-        : '../dist/public',
+        : process.env.REPL_ID
+          ? path.join(process.env.REPL_HOME || '', 'dist/public')
+          : '../dist/public',
     emptyOutDir: true,
     assetsDir: 'assets',
     rollupOptions: {
@@ -48,7 +50,10 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]'
       }
-    }
+    },
+    // Ensure CSS is extracted and properly handled
+    cssCodeSplit: true,
+    sourcemap: true
   },
   resolve: {
     alias: {
