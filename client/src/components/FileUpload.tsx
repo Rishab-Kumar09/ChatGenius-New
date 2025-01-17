@@ -1,20 +1,30 @@
-import { ChangeEvent, useRef } from "react";
+import { useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Paperclip } from "lucide-react";
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
-  accept?: string;
+  disabled?: boolean;
 }
 
-export function FileUpload({ onFileSelect, accept = "*" }: FileUploadProps) {
+export function FileUpload({ onFileSelect, disabled = false }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    // Handle each selected file
+    Array.from(files).forEach(file => {
       onFileSelect(file);
-    }
+    });
+
+    // Reset input so the same file can be selected again
+    e.target.value = '';
   };
 
   return (
@@ -22,15 +32,18 @@ export function FileUpload({ onFileSelect, accept = "*" }: FileUploadProps) {
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleFileChange}
-        accept={accept}
         className="hidden"
+        onChange={handleFileChange}
+        multiple // Allow multiple file selection
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" // Add more file types as needed
       />
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        onClick={() => fileInputRef.current?.click()}
+        className="h-9 w-9"
+        onClick={handleClick}
+        disabled={disabled}
       >
         <Paperclip className="h-5 w-5" />
       </Button>

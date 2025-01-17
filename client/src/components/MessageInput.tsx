@@ -34,6 +34,11 @@ interface Message {
   timestamp: string;
 }
 
+interface QueuedFile {
+  file: File;
+  status: 'queued' | 'sending' | 'sent' | 'error';
+}
+
 export function MessageInput({ 
   channelId, 
   recipientId, 
@@ -48,7 +53,7 @@ export function MessageInput({
   const [mentionResults, setMentionResults] = useState<User[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileQueue, setFileQueue] = useState<QueuedFile[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -124,7 +129,7 @@ export function MessageInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() && !selectedFile) return;
+    if (!content.trim() && fileQueue.length === 0) return;
 
     try {
       setIsLoading(true);
@@ -135,27 +140,69 @@ export function MessageInput({
         return;
       }
 
-      const formData = new FormData();
-      formData.append('content', content);
-      if (channelId) formData.append('channelId', channelId);
-      if (recipientId) formData.append('recipientId', recipientId);
-      if (parentId) formData.append('parentId', parentId);
-      
-      if (selectedFile) {
-        formData.append('file', selectedFile);
-      }
+      // If there are files in the queue, send them one by one
+      if (fileQueue.length > 0) {
+        for (let i = 0; i < fileQueue.length; i++) {
+          const queuedFile = fileQueue[i];
+          if (queuedFile.status === 'sent') continue;
 
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        body: formData
-      });
+          // Update file status to sending
+          setFileQueue(prev => prev.map((f, index) => 
+            index === i ? { ...f, status: 'sending' } : f
+          ));
 
-      if (!response.ok) {
-        throw new Error('Failed to send message');
+          const formData = new FormData();
+          formData.append('content', content);
+          if (channelId) formData.append('channelId', channelId);
+          if (recipientId) formData.append('recipientId', recipientId);
+          if (parentId) formData.append('parentId', parentId);
+          formData.append('file', queuedFile.file);
+
+          try {
+            const response = await fetch('/api/messages', {
+              method: 'POST',
+              body: formData
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to send message');
+            }
+
+            // Update file status to sent
+            setFileQueue(prev => prev.map((f, index) => 
+              index === i ? { ...f, status: 'sent' } : f
+            ));
+          } catch (error) {
+            console.error('Failed to send file:', error);
+            // Update file status to error
+            setFileQueue(prev => prev.map((f, index) => 
+              index === i ? { ...f, status: 'error' } : f
+            ));
+            throw error;
+          }
+        }
+
+        // Clear sent files from queue
+        setFileQueue(prev => prev.filter(f => f.status !== 'sent'));
+      } else {
+        // Send text-only message
+        const formData = new FormData();
+        formData.append('content', content);
+        if (channelId) formData.append('channelId', channelId);
+        if (recipientId) formData.append('recipientId', recipientId);
+        if (parentId) formData.append('parentId', parentId);
+
+        const response = await fetch('/api/messages', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send message');
+        }
       }
 
       setContent("");
-      setSelectedFile(null);
 
       // Invalidate queries to refresh the messages
       if (channelId) {
@@ -188,7 +235,7 @@ export function MessageInput({
   }, [handleSubmit]);
 
   const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
+    setFileQueue(prev => [...prev, { file, status: 'queued' }]);
   };
 
   return (
@@ -216,70 +263,107 @@ export function MessageInput({
         </div>
       )}
 
-      {/* File Preview */}
-      {selectedFile && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
-          <div className="flex-1">
-            {selectedFile.type.startsWith('image/') ? (
-              <div className="relative w-32 h-32">
-                <img
-                  src={URL.createObjectURL(selectedFile)}
-                  alt={selectedFile.name}
-                  className="w-full h-full object-cover rounded-md"
-                />
+      {/* File Queue Preview */}
+      {fileQueue.length > 0 && (
+        <div className="px-3 py-2 bg-muted/50 rounded-lg">
+          <div className="flex gap-2 overflow-x-auto">
+            {fileQueue.map((queuedFile, index) => (
+              <div key={index} className="relative group flex-shrink-0">
+                {queuedFile.file.type.startsWith('image/') ? (
+                  <div className="relative aspect-square w-[70px]">
+                    <img
+                      src={URL.createObjectURL(queuedFile.file)}
+                      alt={queuedFile.file.name}
+                      className="w-full h-full object-cover rounded-md"
+                    />
+                    {queuedFile.status === 'sending' && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px]">
+                        Sending...
+                      </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 p-0"
+                      onClick={() => setFileQueue(prev => prev.filter((_, i) => i !== index))}
+                    >
+                      <X className="h-2 w-2 text-white" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="aspect-square w-[70px] bg-background/50 rounded-md p-1.5 flex flex-col items-center justify-center relative">
+                    <div className="text-[10px] text-center truncate w-full">{queuedFile.file.name}</div>
+                    <div className="text-[8px] text-muted-foreground mt-0.5">
+                      {(queuedFile.file.size / 1024).toFixed(1)} KB
+                    </div>
+                    {queuedFile.status === 'sending' && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px]">
+                        Sending...
+                      </div>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 p-0"
+                      onClick={() => setFileQueue(prev => prev.filter((_, i) => i !== index))}
+                    >
+                      <X className="h-2 w-2 text-white" />
+                    </Button>
+                  </div>
+                )}
+                {queuedFile.status === 'error' && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-destructive/90 text-destructive-foreground text-[8px] p-0.5 text-center">
+                    Failed
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-sm">{selectedFile.name}</div>
-            )}
-            <div className="text-xs text-muted-foreground">
-              {(selectedFile.size / 1024).toFixed(1)} KB
-            </div>
+            ))}
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setSelectedFile(null)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="text-[10px] text-muted-foreground mt-1">
+            {fileQueue.length} file{fileQueue.length !== 1 ? 's' : ''} selected
+          </div>
         </div>
       )}
 
       <div className="flex gap-2 items-end">
-        <FileUpload onFileSelect={handleFileSelect} />
-        <div className="flex-1 relative">
+        <FileUpload onFileSelect={handleFileSelect} disabled={isLoading} />
+        <div className="flex-1">
           <Textarea
             ref={textareaRef}
             value={content}
             onChange={handleContentChange}
-            onKeyPress={handleKeyPress}
-            placeholder={selectedFile ? "Add a caption..." : placeholder}
-            className="min-h-[60px] resize-none"
+            onKeyDown={handleKeyPress}
+            placeholder={fileQueue.length > 0 ? "Add a caption..." : placeholder}
+            className="min-h-[2.5rem] max-h-32 resize-none"
+            disabled={isLoading}
           />
-          
-          {/* Mention suggestions */}
           {showMentions && mentionResults.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-1 w-64 bg-background border rounded-lg shadow-lg overflow-hidden">
-              {mentionResults.map((user) => (
+            <div className="absolute z-10 mt-1 w-64 max-h-48 overflow-auto bg-background border rounded-md shadow-lg">
+              {mentionResults.map(user => (
                 <button
                   key={user.id}
-                  type="button"
-                  className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left hover:bg-muted/50 focus:bg-muted/50 focus:outline-none"
                   onClick={() => insertMention(user)}
+                  type="button"
                 >
-                  <span className="font-medium">{user.displayName || user.username}</span>
-                  {user.displayName && (
-                    <span className="text-sm text-muted-foreground">@{user.username}</span>
-                  )}
+                  {user.displayName || user.username}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <Button type="submit" size="icon" disabled={isLoading || (!content.trim() && !selectedFile)}>
-          <Send className={cn("h-5 w-5", isLoading && "animate-pulse")} />
+        <Button 
+          type="submit" 
+          size="icon"
+          disabled={(!content.trim() && fileQueue.length === 0) || isLoading}
+          className={cn(
+            "h-9 w-9",
+            isLoading && "animate-pulse"
+          )}
+        >
+          <Send className="h-5 w-5" />
         </Button>
       </div>
     </form>

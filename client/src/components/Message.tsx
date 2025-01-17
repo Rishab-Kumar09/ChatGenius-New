@@ -45,12 +45,12 @@ export function Message({ message, isLastInGroup }: MessageProps) {
           <img
             src={fileUrl}
             alt={message.fileName || 'Image'}
-            className="max-w-[300px] max-h-[300px] rounded-lg cursor-pointer object-contain hover:opacity-90"
+            className="max-w-[400px] max-h-[400px] rounded-lg cursor-pointer object-contain hover:opacity-90"
             onClick={() => setShowFullImage(true)}
           />
           
           <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
-            <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-none">
+            <DialogContent className="sm:max-w-[90vw] md:max-w-[75vw] lg:max-w-[60vw] h-[80vh] p-0 bg-black/90 border-none overflow-hidden">
               <DialogHeader className="absolute top-0 right-0 p-2 z-10">
                 <Button
                   variant="ghost"
@@ -61,11 +61,11 @@ export function Message({ message, isLastInGroup }: MessageProps) {
                   <Download className="h-5 w-5" />
                 </Button>
               </DialogHeader>
-              <div className="w-full h-full flex items-center justify-center p-4">
+              <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
                 <img
                   src={fileUrl}
                   alt={message.fileName || 'Image'}
-                  className="max-w-full max-h-[85vh] object-contain"
+                  className="w-auto h-auto max-w-[95%] max-h-[95%] object-contain"
                 />
               </div>
             </DialogContent>
