@@ -69,6 +69,49 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
+      fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o755 });
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const timestamp = Date.now();
+      cb(null, `${timestamp}${ext}`);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+// Configure multer for avatars
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const avatarsDir = path.join(process.cwd(), 'data', 'avatars');
+    fs.mkdirSync(avatarsDir, { recursive: true, mode: 0o755 });
+    cb(null, avatarsDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const timestamp = Date.now();
+    cb(null, `${timestamp}${ext}`);
+  }
+});
+
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  }
+});
+
 export function registerRoutes(app: Express): Server {
   // Set up authentication routes and middleware
   setupAuth(app);
@@ -457,15 +500,15 @@ export function registerRoutes(app: Express): Server {
     res.json({ success: true });
   });
 
-  // Configure multer storage for avatars
-  const storage = multer.diskStorage({
+  // Configure multer storage for files
+  const fileStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-      // Create avatars directory with absolute path
-      const avatarDir = path.join(process.cwd(), 'data', 'avatars');
+      // Create uploads directory with absolute path
+      const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
       // Ensure directory exists with proper permissions
-      fs.mkdirSync(avatarDir, { recursive: true, mode: 0o755 });
-      console.log('Avatar directory:', avatarDir);
-      cb(null, avatarDir);
+      fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o755 });
+      console.log('Uploads directory:', uploadsDir);
+      cb(null, uploadsDir);
     },
     filename: (req, file, cb) => {
       // Generate unique filename with original extension
@@ -477,30 +520,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  const upload = multer({ 
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-    fileFilter: (req, file, cb) => {
-      // Only allow image files
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.mimetype)) {
-        cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'));
-        return;
-      }
-      cb(null, true);
-    }
+  const fileUpload = multer({ 
+    storage: fileStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   });
 
-  // Ensure avatar directory exists and serve files with proper MIME types
-  const avatarDir = path.join(process.cwd(), 'data', 'avatars');
-  fs.mkdirSync(avatarDir, { recursive: true, mode: 0o755 });
-  
-  // Remove the static file middleware and replace with an API endpoint
-  app.get('/api/avatars/:filename', (req, res) => {
+  // Serve uploaded files
+  app.get('/api/uploads/:filename', (req, res) => {
     const fileName = path.basename(req.params.filename);
-    const filePath = path.join(avatarDir, fileName);
+    const filePath = path.join(process.cwd(), 'data', 'uploads', fileName);
     
-    console.log('Avatar request:', {
+    console.log('File request:', {
       url: req.url,
       fileName,
       filePath,
@@ -509,16 +539,16 @@ export function registerRoutes(app: Express): Server {
 
     // If file doesn't exist, return 404 immediately
     if (!fs.existsSync(filePath)) {
-      console.error('Avatar file not found:', filePath);
-      return res.status(404).json({ error: 'Avatar not found' });
+      console.error('File not found:', filePath);
+      return res.status(404).json({ error: 'File not found' });
     }
 
-    // Verify the file is within the avatars directory (prevent directory traversal)
+    // Verify the file is within the uploads directory (prevent directory traversal)
     const normalizedFilePath = path.normalize(filePath);
-    const normalizedAvatarDir = path.normalize(avatarDir);
-    if (!normalizedFilePath.startsWith(normalizedAvatarDir)) {
-      console.error('Invalid avatar path:', filePath);
-      return res.status(403).json({ error: 'Invalid avatar path' });
+    const normalizedUploadsDir = path.normalize(path.join(process.cwd(), 'data', 'uploads'));
+    if (!normalizedFilePath.startsWith(normalizedUploadsDir)) {
+      console.error('Invalid file path:', filePath);
+      return res.status(403).json({ error: 'Invalid file path' });
     }
 
     // Set proper content type based on file extension
@@ -545,50 +575,8 @@ export function registerRoutes(app: Express): Server {
     res.sendFile(filePath);
   });
 
-  // Update the avatar upload endpoint to return the new API URL
-  app.post('/api/users/me/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
-      console.log('File upload details:', {
-        originalname: req.file.originalname,
-        filename: req.file.filename,
-        path: req.file.path,
-        mimetype: req.file.mimetype
-      });
-
-      // Delete old avatar if it exists
-      if (req.user?.avatarUrl) {
-        const oldAvatarPath = path.join(avatarDir, path.basename(req.user.avatarUrl));
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-        }
-      }
-
-      // Use the API endpoint URL instead of direct file path
-      const avatarUrl = `/api/avatars/${req.file.filename}`;
-
-      // Update user's avatar in database
-      await db
-        .update(users)
-        .set({ avatarUrl })
-        .where(eq(users.id, req.user!.id));
-
-      console.log('Avatar updated successfully:', avatarUrl);
-      res.json({ avatarUrl });
-    } catch (error) {
-      console.error('Avatar upload error:', error);
-      if (req.file?.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to upload avatar' });
-    }
-  });
-
   // Add file upload to messages endpoint
-  app.post("/api/messages", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
+  app.post("/api/messages", requireAuth, fileUpload.single('file'), async (req: Request, res: Response) => {
     try {
       console.log('Starting message creation with file:', req.file);
       const { content, channelId, parentId, recipientId } = req.body;
@@ -598,6 +586,27 @@ export function registerRoutes(app: Express): Server {
         console.log('No content or file provided');
         return res.status(400).json({ error: "Message must contain either text content or a file" });
       }
+
+      // Create message data
+      const messageData = {
+        content: content?.trim() || '',
+        senderId: req.user!.id,
+        channelId: channelId ? parseInt(channelId) : null,
+        recipientId: recipientId ? parseInt(recipientId) : null,
+        parentId: parentId ? parseInt(parentId) : null,
+        ...(req.file && {
+          fileName: req.file.originalname,
+          fileUrl: `/api/uploads/${req.file.filename}`,
+          fileSize: req.file.size,
+          fileType: req.file.mimetype
+        })
+      };
+
+      // Insert user's message
+      const [message] = await db
+        .insert(messages)
+        .values(messageData)
+        .returning();
 
       // Get AI assistant user
       const [aiAssistant] = await db
@@ -621,27 +630,6 @@ export function registerRoutes(app: Express): Server {
                mentionText === 'sarah' || 
                mentionText === 'ai-assistant';
       });
-
-      // Create message data
-      const messageData = {
-        content: content?.trim() || '',
-        senderId: req.user!.id,
-        channelId: channelId ? parseInt(channelId) : null,
-        recipientId: recipientId ? parseInt(recipientId) : null,
-        parentId: parentId ? parseInt(parentId) : null,
-        ...(req.file && {
-          fileName: req.file.originalname,
-          fileUrl: `/uploads/${req.file.filename}`,
-          fileSize: req.file.size,
-          fileType: req.file.mimetype
-        })
-      };
-
-      // Insert user's message
-      const [message] = await db
-        .insert(messages)
-        .values(messageData)
-        .returning();
 
       // Generate AI response if:
       // 1. Direct message to Sarah, or
@@ -674,13 +662,12 @@ export function registerRoutes(app: Express): Server {
               senderId: aiAssistant.id,
               channelId: channelId ? parseInt(channelId) : null,
               recipientId: isAIDM ? req.user!.id : null,
-              // Only set parentId if this is a reply (not a new DM or mention)
               parentId: (!isAIDM && !hasSarahMention) || message.parentId ? message.id : null
             })
             .returning();
 
           // Broadcast AI response
-          const [formattedAIMessage] = await db
+          const [formattedMessage] = await db
             .select({
               message: messages,
               sender: {
@@ -698,12 +685,12 @@ export function registerRoutes(app: Express): Server {
           broadcastEvent({
             type: 'message',
             data: {
-              id: formattedAIMessage.message.id,
-              content: formattedAIMessage.message.content,
-              channelId: formattedAIMessage.message.channelId,
-              recipientId: formattedAIMessage.message.recipientId,
-              timestamp: formattedAIMessage.message.createdAt,
-              sender: formattedAIMessage.sender
+              id: formattedMessage.message.id,
+              content: formattedMessage.message.content,
+              channelId: formattedMessage.message.channelId,
+              recipientId: formattedMessage.message.recipientId,
+              timestamp: formattedMessage.message.createdAt,
+              sender: formattedMessage.sender
             }
           });
         }
@@ -733,12 +720,12 @@ export function registerRoutes(app: Express): Server {
           id: sender.id,
           username: sender.username,
           displayName: sender.displayName,
-          avatarUrl: sender.avatarUrl,
+          avatarUrl: sender.avatarUrl
         },
-        fileName: message.fileName,
-        fileUrl: message.fileUrl,
-        fileSize: message.fileSize,
-        fileType: message.fileType
+        fileName: message.fileName || null,
+        fileUrl: message.fileUrl || null,
+        fileSize: message.fileSize || null,
+        fileType: message.fileType || null
       };
 
       // Broadcast using SSE
@@ -782,7 +769,19 @@ export function registerRoutes(app: Express): Server {
         // Get channel messages with replies
         messageQuery = db
           .select({
-            message: messages,
+            message: {
+              id: messages.id,
+              content: messages.content,
+              channelId: messages.channelId,
+              recipientId: messages.recipientId,
+              parentId: messages.parentId,
+              replyCount: messages.replyCount,
+              createdAt: messages.createdAt,
+              fileName: messages.fileName,
+              fileUrl: messages.fileUrl,
+              fileSize: messages.fileSize,
+              fileType: messages.fileType
+            },
             sender: {
               id: users.id,
               username: users.username,
@@ -806,12 +805,24 @@ export function registerRoutes(app: Express): Server {
         // Get DM messages with replies between current user and recipient
         messageQuery = db
           .select({
-            message: messages,
+            message: {
+              id: messages.id,
+              content: messages.content,
+              channelId: messages.channelId,
+              recipientId: messages.recipientId,
+              parentId: messages.parentId,
+              replyCount: messages.replyCount,
+              createdAt: messages.createdAt,
+              fileName: messages.fileName,
+              fileUrl: messages.fileUrl,
+              fileSize: messages.fileSize,
+              fileType: messages.fileType
+            },
             sender: {
               id: users.id,
               username: users.username,
               displayName: users.displayName,
-              avatarUrl: users.avatarUrl,
+              avatarUrl: users.avatarUrl
             }
           })
           .from(messages)
@@ -2300,7 +2311,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Debug route to list all users
-  app.get("/api/debug/users", async (req, res) => {
+  app.get("/api/debug/users", async (req: Request, res: Response) => {
     try {
       const allUsers = await db
         .select({
@@ -2315,6 +2326,77 @@ export function registerRoutes(app: Express): Server {
       console.error('Error listing users:', error);
       res.status(500).json({ error: "Internal server error" });
     }
+  });
+
+  // Upload avatar endpoint
+  app.post("/api/users/me/avatar", requireAuth, avatarUpload.single('avatar'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Update user's avatar URL in database
+      const avatarUrl = `/api/avatars/${req.file.filename}`;
+      await db
+        .update(users)
+        .set({ avatarUrl })
+        .where(eq(users.id, req.user!.id));
+
+      // Broadcast profile update
+      broadcastEvent({
+        type: 'profile_update',
+        data: {
+          userId: req.user!.id,
+          avatarUrl
+        }
+      });
+
+      res.json({ avatarUrl });
+    } catch (error) {
+      console.error('Failed to upload avatar:', error);
+      res.status(500).json({ error: "Failed to upload avatar" });
+    }
+  });
+
+  // Serve avatar images
+  app.get('/api/avatars/:filename', (req, res) => {
+    const fileName = path.basename(req.params.filename);
+    const filePath = path.join(process.cwd(), 'data', 'avatars', fileName);
+    
+    // If file doesn't exist, return 404
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Avatar not found' });
+    }
+
+    // Verify the file is within the avatars directory (prevent directory traversal)
+    const normalizedFilePath = path.normalize(filePath);
+    const normalizedAvatarsDir = path.normalize(path.join(process.cwd(), 'data', 'avatars'));
+    if (!normalizedFilePath.startsWith(normalizedAvatarsDir)) {
+      return res.status(403).json({ error: 'Invalid avatar path' });
+    }
+
+    // Set proper content type based on file extension
+    const ext = path.extname(filePath).toLowerCase();
+    switch (ext) {
+      case '.jpg':
+      case '.jpeg':
+        res.type('image/jpeg');
+        break;
+      case '.png':
+        res.type('image/png');
+        break;
+      case '.gif':
+        res.type('image/gif');
+        break;
+      case '.webp':
+        res.type('image/webp');
+        break;
+      default:
+        res.type('application/octet-stream');
+    }
+
+    // Stream the file
+    res.sendFile(filePath);
   });
 
   return httpServer;

@@ -216,6 +216,37 @@ export function MessageInput({
         </div>
       )}
 
+      {/* File Preview */}
+      {selectedFile && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+          <div className="flex-1">
+            {selectedFile.type.startsWith('image/') ? (
+              <div className="relative w-32 h-32">
+                <img
+                  src={URL.createObjectURL(selectedFile)}
+                  alt={selectedFile.name}
+                  className="w-full h-full object-cover rounded-md"
+                />
+              </div>
+            ) : (
+              <div className="text-sm">{selectedFile.name}</div>
+            )}
+            <div className="text-xs text-muted-foreground">
+              {(selectedFile.size / 1024).toFixed(1)} KB
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setSelectedFile(null)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       <div className="flex gap-2 items-end">
         <FileUpload onFileSelect={handleFileSelect} />
         <div className="flex-1 relative">
@@ -224,7 +255,7 @@ export function MessageInput({
             value={content}
             onChange={handleContentChange}
             onKeyPress={handleKeyPress}
-            placeholder={placeholder}
+            placeholder={selectedFile ? "Add a caption..." : placeholder}
             className="min-h-[60px] resize-none"
           />
           
@@ -248,7 +279,7 @@ export function MessageInput({
           )}
         </div>
         <Button type="submit" size="icon" disabled={isLoading || (!content.trim() && !selectedFile)}>
-          <Send className="h-5 w-5" />
+          <Send className={cn("h-5 w-5", isLoading && "animate-pulse")} />
         </Button>
       </div>
     </form>

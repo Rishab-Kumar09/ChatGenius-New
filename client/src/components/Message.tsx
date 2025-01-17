@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { cn } from "../lib/utils";
+import { cn, getFullUrl } from "../lib/utils";
 import { File as FileIcon, Download } from "lucide-react";
 import {
   Dialog,
@@ -25,6 +25,7 @@ function formatFileSize(bytes: number): string {
 
 export function Message({ message, isLastInGroup }: MessageProps) {
   const [showFullImage, setShowFullImage] = useState(false);
+  const fileUrl = getFullUrl(message.fileUrl);
 
   const handleImageDownload = (url: string, fileName: string) => {
     const link = document.createElement('a');
@@ -36,11 +37,13 @@ export function Message({ message, isLastInGroup }: MessageProps) {
   };
 
   const renderFileContent = () => {
+    if (!fileUrl) return null;
+
     if (message.fileType?.startsWith('image/')) {
       return (
         <div className="mt-2">
           <img
-            src={message.fileUrl}
+            src={fileUrl}
             alt={message.fileName || 'Image'}
             className="max-w-[300px] max-h-[300px] rounded-lg cursor-pointer object-contain hover:opacity-90"
             onClick={() => setShowFullImage(true)}
@@ -53,14 +56,14 @@ export function Message({ message, isLastInGroup }: MessageProps) {
                   variant="ghost"
                   size="icon"
                   className="text-white hover:bg-white/20"
-                  onClick={() => handleImageDownload(message.fileUrl!, message.fileName!)}
+                  onClick={() => handleImageDownload(fileUrl, message.fileName!)}
                 >
                   <Download className="h-5 w-5" />
                 </Button>
               </DialogHeader>
               <div className="w-full h-full flex items-center justify-center p-4">
                 <img
-                  src={message.fileUrl}
+                  src={fileUrl}
                   alt={message.fileName || 'Image'}
                   className="max-w-full max-h-[85vh] object-contain"
                 />
@@ -73,7 +76,7 @@ export function Message({ message, isLastInGroup }: MessageProps) {
     
     return (
       <a
-        href={message.fileUrl}
+        href={fileUrl}
         download={message.fileName}
         className="inline-flex items-center gap-2 p-2 rounded-md bg-white/5 hover:bg-white/10 transition-colors mt-2"
       >
