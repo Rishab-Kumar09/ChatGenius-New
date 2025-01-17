@@ -8,6 +8,7 @@ import { promisify } from "util";
 import { users, insertUserSchema, type SelectUser, messages } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
+import cookieParser from 'cookie-parser';
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -46,31 +47,39 @@ export const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "chat-genius-session-secret",
   resave: false,
   saveUninitialized: false,
+  proxy: true,
+  store,
+  name: 'connect.sid',
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // Set to false for local development
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  },
-  store
+    sameSite: 'lax', // Changed to lax for local development
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    path: '/',
+  }
 });
 
 export function setupAuth(app: Express) {
-  // Enable CORS with credentials
+  // Enable CORS with credentials before any route handlers
   app.use((req, res, next) => {
     const allowedOrigins = [
       'http://localhost:5173',
+      'http://localhost:3000',
       'https://chat-genius-new.vercel.app',
       'https://chat-genius-new.onrender.com',
+      'https://chat-genius-new.netlify.app',
       process.env.FRONTEND_URL,
     ].filter(Boolean);
 
-    const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
+    const origin = req.headers.origin || req.get('origin') || req.headers.referer;
+    console.log('Request origin:', origin);
+    
+    if (origin && allowedOrigins.some(allowed => origin.startsWith(allowed))) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
       res.setHeader('Access-Control-Allow-Credentials', 'true');
+      console.log('CORS headers set for origin:', origin);
     }
 
     if (req.method === 'OPTIONS') {
@@ -79,13 +88,29 @@ export function setupAuth(app: Express) {
     next();
   });
 
+  // Trust proxy in production
   if (app.get("env") === "production") {
-    app.set("trust proxy", 1); // trust first proxy
+    app.set('trust proxy', true);
   }
+
+  // Add cookie parser before session middleware
+  app.use(cookieParser());
 
   app.use(sessionMiddleware);
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // Add session debug middleware
+  app.use((req, res, next) => {
+    console.log('Session debug:');
+    console.log('- Session ID:', req.sessionID);
+    console.log('- Is Authenticated:', req.isAuthenticated());
+    console.log('- Session:', req.session);
+    console.log('- Cookies:', req.cookies);
+    console.log('- Headers:', req.headers);
+    console.log('- Origin:', req.headers.origin || req.get('origin') || req.headers.referer);
+    next();
+  });
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
@@ -129,14 +154,11 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const result = insertUserSchema.safeParse(req.body);
-      if (!result.success) {
-        return res
-          .status(400)
-          .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).send("Username and password are required");
       }
-
-      const { username, password, displayName, email } = result.data;
 
       // Check if username already exists
       const [existingUsername] = await db
@@ -155,8 +177,8 @@ export function setupAuth(app: Express) {
         .values({
           username,
           password: await crypto.hash(password),
-          displayName,
-          email,
+          email: `${username}@example.com`,
+          displayName: username,
         })
         .returning();
 
@@ -197,27 +219,31 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    const result = insertUserSchema.safeParse(req.body);
-    if (!result.success) {
-      return res
-        .status(400)
-        .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
+    const { username, password } = req.body;
+    console.log('Login attempt for username:', username);
+      
+    if (!username || !password) {
+      return res.status(400).send("Username and password are required");
     }
 
     const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
       if (err) {
+        console.error('Login error:', err);
         return next(err);
       }
 
       if (!user) {
+        console.log('Login failed:', info.message);
         return res.status(400).send(info.message ?? "Login failed");
       }
 
       req.logIn(user, (err) => {
         if (err) {
+          console.error('Login error:', err);
           return next(err);
         }
 
+        console.log('Login successful for user:', user.username);
         return res.json({
           message: "Login successful",
           user
@@ -238,6 +264,9 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
+    console.log('Checking auth status. Is authenticated:', req.isAuthenticated());
+    console.log('Current user:', req.user);
+    
     if (req.isAuthenticated()) {
       return res.json(req.user);
     }
