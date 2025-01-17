@@ -1398,9 +1398,16 @@ export function registerRoutes(app: Express): Server {
           id: users.id,
           username: users.username,
         })
-        .from(users);
+        .from(users)
+        .orderBy(users.id);
       
-      console.log('Available users:', allUsers);
+      console.log('Available users:', JSON.stringify(allUsers, null, 2));
+
+      // Check if the ID is valid
+      if (isNaN(parsedId)) {
+        console.log('Invalid user ID format:', req.params.id);
+        return res.status(400).json({ error: "Invalid user ID format" });
+      }
 
       const [user] = await db
         .select({
@@ -1417,7 +1424,7 @@ export function registerRoutes(app: Express): Server {
         .limit(1);
 
       if (!user) {
-        console.log('User not found:', { rawId: req.params.id, parsedId });
+        console.log('User not found:', { parsedId, availableIds: allUsers.map(u => u.id) });
         return res.status(404).json({ error: "User not found" });
       }
 

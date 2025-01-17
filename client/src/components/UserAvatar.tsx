@@ -64,9 +64,18 @@ export function UserAvatar({ user, className, interactive = true, forceRefresh =
   );
 
   if (interactive) {
-    console.log('UserAvatar clicked:', { userId: user.id, username: user.username }); // Debug log
+    // Skip link if user ID is not available
+    if (!user?.id) {
+      return AvatarComponent;
+    }
+
     return (
-      <Link href={`/users/${user.id}`}>
+      <Link 
+        href={`/users/${user.id}`}
+        onClick={() => {
+          console.log('UserAvatar clicked:', { userId: user.id, username: user.username });
+        }}
+      >
         {AvatarComponent}
       </Link>
     );

@@ -10,20 +10,35 @@ export function UserProfile() {
   const { id } = useParams();
   const { user: currentUser } = useUser();
 
+  console.log('UserProfile mounted:', { id, currentUser }); // Debug log
+
   // Handle both numeric IDs and special 'sarah' case
-  const userId = id === 'sarah' ? 'sarah' : id;
+  const userId = id === 'sarah' ? 'sarah' : id ? parseInt(id, 10) : null;
 
   const { data: profile, isLoading, error } = useQuery<SelectUser>({
     queryKey: ['user', userId],
     queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to fetch user profile');
+      console.log('Fetching user profile:', { userId }); // Debug log
+      
+      if (userId === null) {
+        throw new Error('User ID is required');
       }
-      return response.json();
+
+      // Handle NaN case early
+      if (typeof userId === 'number' && isNaN(userId)) {
+        throw new Error('Invalid user ID format');
+      }
+
+      const response = await fetch(`/api/users/${userId}`);
+      const data = await response.json();
+      console.log('API response:', { status: response.status, data }); // Debug log
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch user profile');
+      }
+      return data;
     },
-    enabled: !!userId,
+    enabled: userId !== null,
     retry: false, // Don't retry on failure
   });
 
