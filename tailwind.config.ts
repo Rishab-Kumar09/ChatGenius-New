@@ -4,6 +4,9 @@ export default {
   content: [
     "./client/src/**/*.{js,jsx,ts,tsx}",
     "./client/index.html",
+    "./dist/public/**/*.{html,js}",
+    "./client/dist/**/*.{html,js}",
+    "./public/**/*.{html,js}"
   ],
   theme: {
     extend: {
