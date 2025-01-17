@@ -70,11 +70,16 @@ export function UserAvatar({
     e.preventDefault();
     e.stopPropagation();
 
-    // If this is the current user's avatar, navigate to /profile
+    // If this is Sarah (ai-assistant), navigate to her profile page
+    if (user.username === 'ai-assistant') {
+      setLocation('/profile/sarah');
+      return;
+    }
+
+    // For other users, navigate to their specific profile page
     if (currentUser && user.id === currentUser.id) {
       setLocation('/profile');
     } else {
-      // For other users, navigate to their specific profile page
       setLocation(`/profile/${user.id}`);
     }
   };

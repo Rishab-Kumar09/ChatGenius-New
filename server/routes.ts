@@ -349,6 +349,28 @@ export function registerRoutes(app: Express): Server {
     // Send initial connection event
     sendEvent({ type: 'connected', data: { userId: req.user?.id } });
 
+    // Get Sarah's ID and send her presence status
+    (async () => {
+      const [sarah] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, 'ai-assistant'))
+        .limit(1);
+
+      if (sarah) {
+        sendEvent({
+          type: 'presence',
+          data: {
+            userId: sarah.id.toString(),
+            status: 'online',
+            lastSeen: new Date().toISOString()
+          }
+        });
+      }
+    })().catch(error => {
+      console.error('Error sending Sarah presence status:', error);
+    });
+
     // Send initial ping
     if (!res.writableEnded && res.writable) {
       res.write(':\n\n');
@@ -390,11 +412,13 @@ export function registerRoutes(app: Express): Server {
     // Handle client disconnect
     req.on('close', () => {
       cleanup();
+      // Broadcast offline status when client disconnects
       broadcastEvent({
         type: 'presence',
         data: {
           userId: client.id,
-          status: 'offline'
+          status: 'offline',
+          lastSeen: new Date().toISOString()
         }
       });
     });
@@ -420,9 +444,14 @@ export function registerRoutes(app: Express): Server {
       return res.status(400).json({ error: "Invalid status" });
     }
 
+    // Broadcast presence update to all clients except the sender
     broadcastEvent({
       type: 'presence',
-      data: { userId, status }
+      data: { 
+        userId, 
+        status,
+        lastSeen: new Date().toISOString()
+      }
     }, userId);
 
     res.json({ success: true });
@@ -1264,6 +1293,34 @@ export function registerRoutes(app: Express): Server {
 
   // Get user by ID
   app.get("/api/users/:id", requireAuth, async (req, res) => {
+    // Special case for Sarah's profile
+    if (req.params.id === 'sarah') {
+      const [sarah] = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          displayName: users.displayName,
+          avatarUrl: users.avatarUrl,
+          aboutMe: users.aboutMe,
+          email: users.email,
+          createdAt: sql`CAST(strftime('%s', ${users.createdAt}) AS INTEGER) * 1000`,
+        })
+        .from(users)
+        .where(eq(users.username, 'ai-assistant'))
+        .limit(1);
+
+      if (!sarah) {
+        return res.status(404).json({ error: "Sarah's profile not found" });
+      }
+
+      const response = {
+        ...sarah,
+        createdAt: new Date(sarah.createdAt as number).toISOString()
+      };
+
+      return res.json(response);
+    }
+
     try {
       const userId = parseInt(req.params.id, 10);
       if (isNaN(userId)) {

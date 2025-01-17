@@ -10,8 +10,8 @@ export function UserProfile() {
   const { id } = useParams();
   const { user: currentUser } = useUser();
 
-  // Convert string ID from URL to number for API call
-  const userId = id ? parseInt(id, 10) : currentUser?.id;
+  // Handle both numeric IDs and special 'sarah' case
+  const userId = id === 'sarah' ? 'sarah' : id ? parseInt(id, 10) : currentUser?.id;
 
   const { data: profile, isLoading } = useQuery<SelectUser>({
     queryKey: [`/api/users/${userId}`],

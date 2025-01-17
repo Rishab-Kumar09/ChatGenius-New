@@ -14,6 +14,7 @@ import { parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useEventSource } from "@/hooks/use-event-source";
 import { DocumentUpload } from "@/components/DocumentUpload";
+import { ReplyPreview } from "@/components/ReplyPreview";
 
 export function DirectMessage() {
   const { id } = useParams();
@@ -22,6 +23,7 @@ export function DirectMessage() {
   const [replyingTo, setReplyingTo] = useState<ThreadMessage | null>(null);
   const queryClient = useQueryClient();
   const { lastEvent } = useEventSource();
+  const [presenceUpdates, setPresenceUpdates] = useState<Map<string, { status: string, lastSeen: string }>>(new Map());
 
   // Fetch recipient user data
   const { data: recipientUser } = useQuery<User>({
@@ -109,10 +111,20 @@ export function DirectMessage() {
         queryKey: ['/api/messages', id]
       });
 
-      // Invalidate conversations to update sidebar
+      // Force an immediate refetch of conversations to update sidebar
       await queryClient.invalidateQueries({
         queryKey: ['/api/messages/conversations']
       });
+      await queryClient.refetchQueries({
+        queryKey: ['/api/messages/conversations'],
+        type: 'active'
+      });
+
+      // Broadcast conversation update event
+      const event = new CustomEvent('conversation_update', {
+        detail: { recipientId: id }
+      });
+      window.dispatchEvent(event);
       
       // Clear reply state
       setReplyingTo(null);
@@ -202,12 +214,27 @@ export function DirectMessage() {
     }
   };
 
+  // Handle SSE events
+  useEffect(() => {
+    if (lastEvent?.type === 'presence') {
+      setPresenceUpdates(prev => {
+        const newMap = new Map(prev);
+        newMap.set(lastEvent.data.userId, {
+          status: lastEvent.data.status,
+          lastSeen: lastEvent.data.lastSeen
+        });
+        return newMap;
+      });
+    }
+  }, [lastEvent]);
+
   if (!recipientUser) {
     return null;
   }
 
   // Get user status from presence updates
-  const userStatus = 'online'; // Simplified for now since we removed WebSocket presence
+  const userStatus = recipientUser.username === 'ai-assistant' ? 'online' :
+    presenceUpdates.get(recipientUser.id.toString())?.status || 'offline';
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -216,7 +243,15 @@ export function DirectMessage() {
           <UserAvatar user={recipientUser} />
           <div>
             <h2 className="font-semibold">{recipientUser.displayName || recipientUser.username}</h2>
-            <p className="text-sm text-muted-foreground">{userStatus}</p>
+            <div className="flex items-center gap-2">
+              <Circle className={cn(
+                "h-2 w-2 fill-current",
+                userStatus === 'online' && "text-green-500",
+                userStatus === 'busy' && "text-yellow-500",
+                userStatus === 'offline' && "text-red-500"
+              )} />
+              <p className="text-sm text-muted-foreground">{userStatus}</p>
+            </div>
           </div>
         </div>
         {/* DocumentUpload component hidden but functionality preserved */}
@@ -239,6 +274,12 @@ export function DirectMessage() {
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 bg-background">
+          {replyingTo && (
+            <ReplyPreview 
+              message={replyingTo} 
+              onCancel={() => setReplyingTo(null)} 
+            />
+          )}
           <MessageInput 
             recipientId={id}
             placeholder="Type a message..."

@@ -14,9 +14,8 @@ import { useSearch } from "@/hooks/useSearch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SelectChannel } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
-import { useEventSource } from "@/lib/useEventSource";
-import { useWebSocket } from "@/lib/useWebSocket";
-import type { Channel, User } from "@/lib/types";
+import { useEventSource } from "@/hooks/use-event-source";
+import type { Channel, User, PresenceUpdate } from "@/lib/types";
 import { Link } from "wouter";
 import {
   Dialog,
@@ -87,7 +86,7 @@ export function Sidebar({ className }: { className?: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { query, setQuery, results, isLoading } = useSearch();
-  const { messages: wsMessages, presenceUpdates } = useWebSocket();
+  const [presenceUpdates, setPresenceUpdates] = useState<Map<string, PresenceUpdate>>(new Map());
   const [pathname] = useLocation();
 
   const form = useForm<ChannelFormData>({
@@ -104,7 +103,7 @@ export function Sidebar({ className }: { className?: string }) {
   });
 
   // Fetch conversations
-  const { data: conversations = [] } = useQuery<Conversation[]>({
+  const { data: conversations = [], refetch: refetchConversations } = useQuery<Conversation[]>({
     queryKey: ['/api/messages/conversations'],
     enabled: !!currentUser,
   });
@@ -124,54 +123,31 @@ export function Sidebar({ className }: { className?: string }) {
     enabled: !!currentUser
   });
 
-  // Refresh conversations when receiving WebSocket messages
+  // Listen for conversation updates
   useEffect(() => {
-    if (wsMessages.length > 0) {
-      // Only refresh if the message is a DM
-      const hasDM = wsMessages.some(msg => msg.recipientId || msg.dmId);
-      if (hasDM) {
-        queryClient.invalidateQueries({ 
-          queryKey: ['/api/messages/conversations']
-        });
-      }
-    }
-  }, [wsMessages, queryClient]);
+    const handleConversationUpdate = () => {
+      refetchConversations();
+    };
 
-  // Connect to SSE for real-time updates
-  useEventSource('/api/events', {
-    onMessage: (data) => {
-      if (data.type === 'channel') {
-        // For all channel events, invalidate and refetch
-        queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
-        
-        // If it's a deleted channel, handle navigation
-        if (data.data.action === 'deleted') {
-          const currentPath = window.location.pathname;
-          if (currentPath === `/channel/${data.data.channelId}`) {
-            navigate('/');
-          }
-        }
-        
-        // If it's an invitation event, refetch invitations
-        if (data.data.action === 'invitation_created') {
-          queryClient.invalidateQueries({ queryKey: ['/api/channels/invitations'] });
-          // Show a toast notification for new invitations
-          toast({
-            title: "New Invitation",
-            description: `You've been invited to join ${data.data.invitation.channel.name}`,
-          });
-        }
-      }
-    },
-    onError: (error) => {
-      console.error('SSE connection error:', error);
-      toast({
-        title: "Connection Error",
-        description: "Failed to connect to real-time updates",
-        variant: "destructive"
+    window.addEventListener('conversation_update', handleConversationUpdate);
+    return () => {
+      window.removeEventListener('conversation_update', handleConversationUpdate);
+    };
+  }, [refetchConversations]);
+
+  // Handle SSE events
+  const { lastEvent } = useEventSource();
+  useEffect(() => {
+    if (lastEvent?.type === 'presence') {
+      setPresenceUpdates(prev => {
+        const newMap = new Map(prev);
+        newMap.set(lastEvent.data.userId, lastEvent.data);
+        return newMap;
       });
+    } else if (lastEvent?.type === 'conversation_update') {
+      refetchConversations();
     }
-  });
+  }, [lastEvent, refetchConversations]);
 
   // Update presence status
   const updatePresenceStatus = async (status: 'online' | 'busy' | 'offline') => {
@@ -439,7 +415,7 @@ export function Sidebar({ className }: { className?: string }) {
                 key={conversation.userId}
                 to={`/dm/${conversation.userId}`}
                 className={cn(
-                  'flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  'flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground mb-1',
                   {
                     'bg-accent text-accent-foreground': pathname === `/dm/${conversation.userId}`,
                   }
@@ -447,9 +423,13 @@ export function Sidebar({ className }: { className?: string }) {
               >
                 <UserAvatar user={conversation} className="h-6 w-6" />
                 <span className="flex-1">{conversation.displayName || conversation.username}</span>
-                {conversation.username !== 'sarah' && (
-                  <Circle className="h-2 w-2 fill-current" />
-                )}
+                <Circle className={cn(
+                  "h-2 w-2 fill-current",
+                  conversation.username === 'ai-assistant' ? "text-green-500" :
+                  presenceUpdates.get(conversation.userId.toString())?.status === 'online' && "text-green-500",
+                  presenceUpdates.get(conversation.userId.toString())?.status === 'busy' && "text-yellow-500",
+                  (!presenceUpdates.get(conversation.userId.toString()) || presenceUpdates.get(conversation.userId.toString())?.status === 'offline') && "text-red-500"
+                )} />
               </Link>
             ))}
           </div>
