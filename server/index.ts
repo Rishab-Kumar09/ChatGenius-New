@@ -4,39 +4,11 @@ import { registerRoutes } from "./routes";
 import { initializeDatabase } from "@db";
 import { seedDatabase } from "@db/seed";
 import path from "path";
-import multer from "multer";
-import fs from "fs";
 import { fileURLToPath } from 'url';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Configure upload directories
-const uploadDir = path.join(process.cwd(), 'data', 'uploads');
-const avatarDir = path.join(uploadDir, 'avatars');
-
-// Configure multer storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    // Store avatars in a separate directory
-    const dest = file.fieldname === 'avatar' ? avatarDir : uploadDir;
-    cb(null, dest);
-  },
-  filename: function (req, file, cb) {
-    // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-// Create multer instance
-export const upload = multer({ 
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
-});
 
 async function startServer() {
   const app = express();
@@ -44,19 +16,11 @@ async function startServer() {
   // Parse JSON bodies
   app.use(express.json());
 
-  // Create upload directories if they don't exist
-  fs.mkdirSync(uploadDir, { recursive: true });
-  fs.mkdirSync(avatarDir, { recursive: true });
-
   // Initialize database and create tables
   await initializeDatabase();
 
   // Run database seeding
   await seedDatabase();
-
-  // Serve static files from uploads directory
-  app.use('/uploads', express.static(uploadDir));
-  app.use('/uploads/avatars', express.static(avatarDir));
 
   // Serve static files from the client build directory
   const clientDistPath = path.join(__dirname, '../dist/public');

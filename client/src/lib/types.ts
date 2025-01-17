@@ -7,6 +7,7 @@ export interface User {
   displayName?: string | null;
   isOnline?: boolean;
   status?: 'online' | 'busy' | 'offline';
+  presence?: { status: 'online' | 'busy' | 'offline' };
   isTyping?: boolean;
   avatarUrl?: string | null;
   aboutMe?: string | null;

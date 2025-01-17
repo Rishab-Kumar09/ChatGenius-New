@@ -34,7 +34,7 @@ function App() {
           <Route path="/channel/:id" component={Channel} />
           <Route path="/dm/:id" component={DirectMessage} />
           <Route path="/profile" component={ProfilePage} />
-          <Route path="/profile/:id" component={UserProfile} />
+          <Route path="/users/:id" component={UserProfile} />
           <Route component={NotFound} />
         </Switch>
       </MainLayout>

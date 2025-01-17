@@ -1,110 +1,76 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User } from "@/lib/types";
+import type { User } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useLocation } from "wouter";
-import { useUser } from "@/hooks/use-user";
+import { useState } from "react";
+import { Link } from "wouter";
 
 interface UserAvatarProps {
-  user: User | null | undefined;
+  user: User;
   className?: string;
   interactive?: boolean;
   forceRefresh?: boolean;
 }
 
-export function UserAvatar({
-  user,
-  className,
-  interactive = true,
-  forceRefresh = false
-}: UserAvatarProps) {
-  const [, setLocation] = useLocation();
-  const { user: currentUser } = useUser();
+export function UserAvatar({ user, className, interactive = true, forceRefresh = false }: UserAvatarProps) {
+  const [imageError, setImageError] = useState(false);
+  const [key, setKey] = useState(Date.now());
 
-  // Handle cases where user object is null or undefined
-  if (!user) {
-    return (
-      <Avatar className={cn("ring-2 ring-background", className)}>
-        <AvatarFallback className="text-sm font-semibold bg-primary text-primary-foreground">
-          ?
+  // Reset error state when avatar URL changes
+  const handleError = () => {
+    console.error('Avatar image failed to load:', user.avatarUrl);
+    setImageError(true);
+  };
+
+  // Reset error state when URL changes
+  if (user.avatarUrl && imageError) {
+    setImageError(false);
+    setKey(Date.now()); // Force reload the image
+  }
+
+  // Ensure the avatar URL is absolute
+  const getFullAvatarUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    // If it's already an absolute URL, return as is
+    if (url.startsWith('http')) return url;
+    // If it's a relative URL, make it absolute
+    return `${window.location.origin}${url}${url.includes('?') ? '&' : '?'}t=${key}`;
+  };
+
+  const avatarUrl = getFullAvatarUrl(user.avatarUrl);
+
+  const AvatarComponent = (
+    <Avatar 
+      className={cn(
+        "relative border-2 border-background dark:border-background",
+        interactive && "cursor-pointer hover:opacity-80",
+        className
+      )}
+    >
+      {avatarUrl && !imageError ? (
+        <AvatarImage 
+          src={avatarUrl}
+          alt={user.displayName || user.username}
+          onError={handleError}
+        />
+      ) : (
+        <AvatarFallback className="bg-primary text-primary-foreground">
+          {(user.displayName || user.username || "?").charAt(0).toUpperCase()}
         </AvatarFallback>
-      </Avatar>
+      )}
+      {user.presence?.status === "online" && (
+        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background dark:border-background" />
+      )}
+    </Avatar>
+  );
+
+  if (interactive) {
+    console.log('UserAvatar clicked:', { userId: user.id, username: user.username }); // Debug log
+    return (
+      <Link href={`/users/${user.id}`}>
+        {AvatarComponent}
+      </Link>
     );
   }
 
-  // Get initials from username as fallback
-  const getInitials = () => {
-    if (user.username) {
-      return user.username[0].toUpperCase();
-    }
-    return '?';
-  };
-
-  // Get the avatar URL, handling both full URLs and relative paths
-  const getAvatarUrl = () => {
-    if (!user.avatarUrl) return undefined;
-
-    // If it's already a full URL, return as is
-    if (user.avatarUrl.startsWith('http') || user.avatarUrl.startsWith('data:')) {
-      return user.avatarUrl;
-    }
-
-    // For relative paths, ensure they start with /uploads/avatars/
-    let url = user.avatarUrl;
-    if (!url.startsWith('/uploads/avatars/')) {
-      url = `/uploads/avatars/${url.replace(/^\//, '')}`;
-    }
-
-    // Add cache-busting if forceRefresh is true
-    if (forceRefresh) {
-      url = `${url}?t=${Date.now()}`;
-    }
-
-    return url;
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (!interactive) {
-      return;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    // If this is Sarah (ai-assistant), navigate to her profile page
-    if (user.username === 'ai-assistant') {
-      setLocation('/profile/sarah');
-      return;
-    }
-
-    // For other users, navigate to their specific profile page
-    if (currentUser && user.id === currentUser.id) {
-      setLocation('/profile');
-    } else {
-      setLocation(`/profile/${user.id}`);
-    }
-  };
-
-  return (
-    <Avatar 
-      className={cn(
-        "ring-2 ring-background", 
-        interactive && "cursor-pointer hover:opacity-80 transition-opacity",
-        !interactive && "cursor-default",
-        className
-      )}
-      onClick={handleClick}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : undefined}
-    >
-      <AvatarImage
-        src={getAvatarUrl()}
-        alt={user.username ? `${user.username}'s avatar` : 'User avatar'}
-      />
-      <AvatarFallback 
-        className="text-sm font-semibold bg-primary text-primary-foreground"
-      >
-        {getInitials()}
-      </AvatarFallback>
-    </Avatar>
-  );
+  return AvatarComponent;
 }

@@ -13,7 +13,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useEventSource } from "@/hooks/use-event-source";
-import { DocumentUpload } from "@/components/DocumentUpload";
 import { ReplyPreview } from "@/components/ReplyPreview";
 
 export function DirectMessage() {

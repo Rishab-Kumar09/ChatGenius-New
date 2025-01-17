@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from '@tanstack/react-query';
-import { Paperclip, Send, X } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useQuery } from '@tanstack/react-query';
+import { FileUpload } from '@/components/FileUpload';
 
 interface MessageInputProps {
   channelId?: string;
@@ -47,9 +48,9 @@ export function MessageInput({
   const [mentionResults, setMentionResults] = useState<User[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Fetch the parent message if we're replying
@@ -123,7 +124,7 @@ export function MessageInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() && !fileInputRef.current?.files?.length) return;
+    if (!content.trim() && !selectedFile) return;
 
     try {
       setIsLoading(true);
@@ -140,8 +141,8 @@ export function MessageInput({
       if (recipientId) formData.append('recipientId', recipientId);
       if (parentId) formData.append('parentId', parentId);
       
-      if (fileInputRef.current?.files?.length) {
-        formData.append('file', fileInputRef.current.files[0]);
+      if (selectedFile) {
+        formData.append('file', selectedFile);
       }
 
       const response = await fetch('/api/messages', {
@@ -154,9 +155,7 @@ export function MessageInput({
       }
 
       setContent("");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setSelectedFile(null);
 
       // Invalidate queries to refresh the messages
       if (channelId) {
@@ -188,6 +187,10 @@ export function MessageInput({
     }
   }, [handleSubmit]);
 
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="p-4 border-t flex flex-col gap-2">
       {/* Reply Preview */}
@@ -214,24 +217,7 @@ export function MessageInput({
       )}
 
       <div className="flex gap-2 items-end">
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          onChange={() => {
-            if (fileInputRef.current?.files?.length) {
-              handleSubmit(new Event('submit') as any);
-            }
-          }}
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Paperclip className="h-5 w-5" />
-        </Button>
+        <FileUpload onFileSelect={handleFileSelect} />
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
@@ -261,7 +247,7 @@ export function MessageInput({
             </div>
           )}
         </div>
-        <Button type="submit" size="icon" disabled={isLoading || (!content.trim() && !fileInputRef.current?.files?.length)}>
+        <Button type="submit" size="icon" disabled={isLoading || (!content.trim() && !selectedFile)}>
           <Send className="h-5 w-5" />
         </Button>
       </div>

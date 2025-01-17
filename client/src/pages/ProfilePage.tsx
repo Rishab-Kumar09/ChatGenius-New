@@ -1,14 +1,14 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { UserAvatar } from "@/components/UserAvatar";
 import { useUser } from "@/hooks/use-user";
 import { format, parseISO } from "date-fns";
-import { PencilLine, Check, X, Camera, Mail, CalendarDays } from "lucide-react";
+import { PencilLine, Check, X, Mail, CalendarDays } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEventSource } from "@/hooks/use-event-source";
+import { AvatarUpload } from "@/components/AvatarUpload.tsx";
 
 export function ProfilePage() {
   const { user } = useUser();
@@ -20,8 +20,6 @@ export function ProfilePage() {
   const [tempAboutMe, setTempAboutMe] = useState(aboutMe);
   const [tempDisplayName, setTempDisplayName] = useState(displayName);
   const [tempEmail, setTempEmail] = useState(email);
-  const [avatarKey, setAvatarKey] = useState(Date.now());
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -30,7 +28,6 @@ export function ProfilePage() {
   useEffect(() => {
     if (lastEvent?.type === 'profile_update' && lastEvent.data.userId === user?.id) {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      setAvatarKey(Date.now());
     }
   }, [lastEvent, user?.id, queryClient]);
 
@@ -48,45 +45,6 @@ export function ProfilePage() {
   if (!user) return null;
 
   const memberSince = user.createdAt ? format(parseISO(user.createdAt.toString()), "MMMM d, yyyy") : "Unknown";
-
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("avatar", file);
-
-    try {
-      const response = await fetch("/api/users/me/avatar", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      const data = await response.json();
-      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      setAvatarKey(Date.now());
-      toast({
-        title: "Success",
-        description: `Avatar updated successfully. URL: ${data.avatarUrl}`,
-      });
-    } catch (error) {
-      console.error("Failed to update avatar:", error);
-      toast({
-        title: "Error",
-        description: `Failed to update avatar: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleSaveBasicInfo = async () => {
     try {
@@ -159,44 +117,34 @@ export function ProfilePage() {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="flex flex-col items-center mb-8">
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          accept="image/*"
-          onChange={handleFileChange}
+        <AvatarUpload 
+          user={user} 
+          size="lg"
+          disabled={user.username === 'ai-assistant'} 
         />
-        
-        <div className="relative group">
-          <UserAvatar
-            user={user}
-            className="h-40 w-40 border-4 border-background ring-4 ring-muted"
-            key={avatarKey}
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            className="absolute bottom-2 right-2 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-background"
-            onClick={handleAvatarClick}
-          >
-            <Camera className="h-4 w-4" />
-          </Button>
-        </div>
 
         <div className="mt-6 w-full max-w-3xl space-y-6">
           {/* Basic Info Card */}
           <div className="rounded-lg border bg-card p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Basic Information</h2>
-              {isEditingBasicInfo ? (
-                <div className="flex gap-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Basic Info</h2>
+              {!isEditingBasicInfo ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditingBasicInfo(true)}
+                >
+                  <PencilLine className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleSaveBasicInfo}
-                    className="h-8 px-2"
                   >
-                    <Check className="h-4 w-4 mr-1" />
+                    <Check className="h-4 w-4 mr-2" />
                     Save
                   </Button>
                   <Button
@@ -207,22 +155,11 @@ export function ProfilePage() {
                       setTempDisplayName(displayName);
                       setTempEmail(email);
                     }}
-                    className="h-8 px-2"
                   >
-                    <X className="h-4 w-4 mr-1" />
+                    <X className="h-4 w-4 mr-2" />
                     Cancel
                   </Button>
                 </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditingBasicInfo(true)}
-                  className="h-8 px-2"
-                >
-                  <PencilLine className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
               )}
             </div>
 
@@ -269,17 +206,25 @@ export function ProfilePage() {
 
           {/* About Me Card */}
           <div className="rounded-lg border bg-card p-6">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">About Me</h2>
-              {isEditingAboutMe ? (
-                <div className="flex gap-2">
+              {!isEditingAboutMe ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditingAboutMe(true)}
+                >
+                  <PencilLine className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleSaveAboutMe}
-                    className="h-8 px-2"
                   >
-                    <Check className="h-4 w-4 mr-1" />
+                    <Check className="h-4 w-4 mr-2" />
                     Save
                   </Button>
                   <Button
@@ -289,22 +234,11 @@ export function ProfilePage() {
                       setIsEditingAboutMe(false);
                       setTempAboutMe(aboutMe);
                     }}
-                    className="h-8 px-2"
                   >
-                    <X className="h-4 w-4 mr-1" />
+                    <X className="h-4 w-4 mr-2" />
                     Cancel
                   </Button>
                 </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditingAboutMe(true)}
-                  className="h-8 px-2"
-                >
-                  <PencilLine className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
               )}
             </div>
 
@@ -316,7 +250,7 @@ export function ProfilePage() {
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                {aboutMe || "No about me set"}
+                {aboutMe || "No information provided"}
               </p>
             )}
           </div>

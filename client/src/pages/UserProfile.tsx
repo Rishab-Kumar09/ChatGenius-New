@@ -11,17 +11,36 @@ export function UserProfile() {
   const { user: currentUser } = useUser();
 
   // Handle both numeric IDs and special 'sarah' case
-  const userId = id === 'sarah' ? 'sarah' : id ? parseInt(id, 10) : currentUser?.id;
+  const userId = id === 'sarah' ? 'sarah' : id;
 
-  const { data: profile, isLoading } = useQuery<SelectUser>({
-    queryKey: [`/api/users/${userId}`],
+  const { data: profile, isLoading, error } = useQuery<SelectUser>({
+    queryKey: ['user', userId],
+    queryFn: async () => {
+      const response = await fetch(`/api/users/${userId}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch user profile');
+      }
+      return response.json();
+    },
     enabled: !!userId,
+    retry: false, // Don't retry on failure
   });
+
+  console.log('UserProfile debug:', { userId, profile, error }); // Debug logging
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-destructive">Error loading profile: {(error as Error).message}</p>
       </div>
     );
   }

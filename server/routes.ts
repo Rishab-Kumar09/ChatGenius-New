@@ -457,38 +457,135 @@ export function registerRoutes(app: Express): Server {
     res.json({ success: true });
   });
 
-  // Configure multer for handling file uploads
+  // Configure multer storage for avatars
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-      // Determine the upload path based on file type
-      let uploadPath = path.join(process.cwd(), 'data', 'uploads');
-
-      // If it's an avatar upload, use the avatars subdirectory
-      if (file.fieldname === 'avatar') {
-        uploadPath = path.join(process.cwd(), 'data', 'uploads', 'avatars');
-      }
-
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(uploadPath)) {
-        fs.mkdirSync(uploadPath, { recursive: true });
-      }
-
-      cb(null, uploadPath);
+      // Create avatars directory with absolute path
+      const avatarDir = path.join(process.cwd(), 'data', 'avatars');
+      // Ensure directory exists with proper permissions
+      fs.mkdirSync(avatarDir, { recursive: true, mode: 0o755 });
+      console.log('Avatar directory:', avatarDir);
+      cb(null, avatarDir);
     },
-    filename: (_req, file, cb) => {
-      cb(null, Date.now() + '-' + file.originalname);
+    filename: (req, file, cb) => {
+      // Generate unique filename with original extension
+      const ext = path.extname(file.originalname).toLowerCase();
+      const timestamp = Date.now();
+      const filename = `${timestamp}${ext}`;
+      console.log('Generated filename:', filename);
+      cb(null, filename);
     }
   });
 
   const upload = multer({ 
-    storage: storage,
-    limits: {
-      fileSize: 5 * 1024 * 1024 // 5MB limit
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+      // Only allow image files
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'));
+        return;
+      }
+      cb(null, true);
     }
   });
 
-  // Serve uploaded files
-  app.use('/uploads', express.static(path.join(process.cwd(), 'data', 'uploads')));
+  // Ensure avatar directory exists and serve files with proper MIME types
+  const avatarDir = path.join(process.cwd(), 'data', 'avatars');
+  fs.mkdirSync(avatarDir, { recursive: true, mode: 0o755 });
+  
+  // Remove the static file middleware and replace with an API endpoint
+  app.get('/api/avatars/:filename', (req, res) => {
+    const fileName = path.basename(req.params.filename);
+    const filePath = path.join(avatarDir, fileName);
+    
+    console.log('Avatar request:', {
+      url: req.url,
+      fileName,
+      filePath,
+      exists: fs.existsSync(filePath)
+    });
+
+    // If file doesn't exist, return 404 immediately
+    if (!fs.existsSync(filePath)) {
+      console.error('Avatar file not found:', filePath);
+      return res.status(404).json({ error: 'Avatar not found' });
+    }
+
+    // Verify the file is within the avatars directory (prevent directory traversal)
+    const normalizedFilePath = path.normalize(filePath);
+    const normalizedAvatarDir = path.normalize(avatarDir);
+    if (!normalizedFilePath.startsWith(normalizedAvatarDir)) {
+      console.error('Invalid avatar path:', filePath);
+      return res.status(403).json({ error: 'Invalid avatar path' });
+    }
+
+    // Set proper content type based on file extension
+    const ext = path.extname(filePath).toLowerCase();
+    switch (ext) {
+      case '.jpg':
+      case '.jpeg':
+        res.type('image/jpeg');
+        break;
+      case '.png':
+        res.type('image/png');
+        break;
+      case '.gif':
+        res.type('image/gif');
+        break;
+      case '.webp':
+        res.type('image/webp');
+        break;
+      default:
+        res.type('application/octet-stream');
+    }
+
+    // Stream the file directly
+    res.sendFile(filePath);
+  });
+
+  // Update the avatar upload endpoint to return the new API URL
+  app.post('/api/users/me/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      console.log('File upload details:', {
+        originalname: req.file.originalname,
+        filename: req.file.filename,
+        path: req.file.path,
+        mimetype: req.file.mimetype
+      });
+
+      // Delete old avatar if it exists
+      if (req.user?.avatarUrl) {
+        const oldAvatarPath = path.join(avatarDir, path.basename(req.user.avatarUrl));
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+
+      // Use the API endpoint URL instead of direct file path
+      const avatarUrl = `/api/avatars/${req.file.filename}`;
+
+      // Update user's avatar in database
+      await db
+        .update(users)
+        .set({ avatarUrl })
+        .where(eq(users.id, req.user!.id));
+
+      console.log('Avatar updated successfully:', avatarUrl);
+      res.json({ avatarUrl });
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to upload avatar' });
+    }
+  });
 
   // Add file upload to messages endpoint
   app.post("/api/messages", requireAuth, upload.single('file'), async (req: Request, res: Response) => {
@@ -828,42 +925,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add profile image upload route
-  app.post('/api/users/me/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
-      // Create relative URL for the avatar
-      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-
-      // Update user's avatar URL in database
-      await db
-        .update(users)
-        .set({ avatarUrl })
-        .where(eq(users.id, req.user!.id));
-
-      // Broadcast profile update event
-      broadcastEvent({
-        type: 'profile_update',
-        data: {
-          userId: req.user!.id,
-          avatarUrl
-        }
-      });
-
-      // Return the full URL for immediate use
-      res.json({ 
-        avatarUrl,
-        message: 'Profile image uploaded successfully' 
-      });
-    } catch (error) {
-      console.error('Failed to upload avatar:', error);
-      res.status(500).json({ error: 'Failed to upload avatar' });
-    }
-  });
-
   // Get only channels where user is a member
   app.get("/api/channels", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -1178,7 +1239,7 @@ export function registerRoutes(app: Express): Server {
       // Add creator as channel member with 'owner' role
       await db.insert(channelMembers).values({
         channelId: newChannel.id,
-        userId: userId,
+        userId,
         role: 'owner'
       });
 
@@ -1292,40 +1353,54 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Get user by ID
-  app.get("/api/users/:id", requireAuth, async (req, res) => {
-    // Special case for Sarah's profile
-    if (req.params.id === 'sarah') {
-      const [sarah] = await db
+  app.get("/api/users/:id", async (req, res) => {
+    console.log('Fetching user profile:', { id: req.params.id });
+
+    try {
+      // Special case for Sarah's profile
+      if (req.params.id === 'sarah') {
+        console.log('Looking up Sarah profile...');
+        const [sarah] = await db
+          .select({
+            id: users.id,
+            username: users.username,
+            displayName: users.displayName,
+            avatarUrl: users.avatarUrl,
+            aboutMe: users.aboutMe,
+            email: users.email,
+            createdAt: sql`CAST(strftime('%s', ${users.createdAt}) AS INTEGER) * 1000`,
+          })
+          .from(users)
+          .where(eq(users.username, 'ai-assistant'))
+          .limit(1);
+
+        if (!sarah) {
+          console.log("Sarah's profile not found");
+          return res.status(404).json({ error: "Sarah's profile not found" });
+        }
+
+        const response = {
+          ...sarah,
+          createdAt: new Date(sarah.createdAt as number).toISOString()
+        };
+
+        console.log('Found Sarah:', response);
+        return res.json(response);
+      }
+
+      // For all other users
+      const parsedId = parseInt(req.params.id);
+      console.log('Looking up user by ID:', { rawId: req.params.id, parsedId });
+
+      // First let's check what users exist
+      const allUsers = await db
         .select({
           id: users.id,
           username: users.username,
-          displayName: users.displayName,
-          avatarUrl: users.avatarUrl,
-          aboutMe: users.aboutMe,
-          email: users.email,
-          createdAt: sql`CAST(strftime('%s', ${users.createdAt}) AS INTEGER) * 1000`,
         })
-        .from(users)
-        .where(eq(users.username, 'ai-assistant'))
-        .limit(1);
-
-      if (!sarah) {
-        return res.status(404).json({ error: "Sarah's profile not found" });
-      }
-
-      const response = {
-        ...sarah,
-        createdAt: new Date(sarah.createdAt as number).toISOString()
-      };
-
-      return res.json(response);
-    }
-
-    try {
-      const userId = parseInt(req.params.id, 10);
-      if (isNaN(userId)) {
-        return res.status(400).json({ error: "Invalid user ID" });
-      }
+        .from(users);
+      
+      console.log('Available users:', allUsers);
 
       const [user] = await db
         .select({
@@ -1338,10 +1413,11 @@ export function registerRoutes(app: Express): Server {
           createdAt: sql`CAST(strftime('%s', ${users.createdAt}) AS INTEGER) * 1000`,
         })
         .from(users)
-        .where(eq(users.id, userId))
+        .where(eq(users.id, parsedId))
         .limit(1);
 
       if (!user) {
+        console.log('User not found:', { rawId: req.params.id, parsedId });
         return res.status(404).json({ error: "User not found" });
       }
 
@@ -1351,7 +1427,7 @@ export function registerRoutes(app: Express): Server {
         createdAt: new Date(user.createdAt as number).toISOString()
       };
 
-      console.log('User data:', response); // Add logging to see the response
+      console.log('Found user:', response);
       res.json(response);
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -1855,7 +1931,7 @@ export function registerRoutes(app: Express): Server {
       await db
         .update(channelInvitations)
         .set({ status: action === 'accept' ? 'accepted' : 'rejected' })
-        .where(eq(channelInvitations.id, invitation.id));
+        .where(eq(channelInvitations.id, parseInt(invitationId)));
 
       if (action === 'accept') {
         // Add user as channel member
@@ -2213,6 +2289,24 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error processing documents:', error);
       res.status(500).json({ error: "Failed to process documents" });
+    }
+  });
+
+  // Debug route to list all users
+  app.get("/api/debug/users", async (req, res) => {
+    try {
+      const allUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          displayName: users.displayName,
+        })
+        .from(users);
+      
+      res.json(allUsers);
+    } catch (error) {
+      console.error('Error listing users:', error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
