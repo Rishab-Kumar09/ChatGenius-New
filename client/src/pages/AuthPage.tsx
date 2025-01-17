@@ -13,6 +13,8 @@ import { useUser } from "@/hooks/use-user";
 const authSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email("Invalid email address").optional(),
+  displayName: z.string().min(2, "Display name must be at least 2 characters").optional(),
 });
 
 type AuthFormData = z.infer<typeof authSchema>;
@@ -20,13 +22,15 @@ type AuthFormData = z.infer<typeof authSchema>;
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const { toast } = useToast();
-  const { login, register, isPending } = useUser();
+  const { login, register: registerUser, isPending } = useUser();
 
   const form = useForm<AuthFormData>({
     resolver: zodResolver(authSchema),
     defaultValues: {
       username: "",
       password: "",
+      email: "",
+      displayName: "",
     },
   });
 
@@ -35,7 +39,12 @@ export default function AuthPage() {
       if (isLogin) {
         await login(data.username, data.password);
       } else {
-        await register(data.username, data.password);
+        await registerUser(
+          data.username, 
+          data.password, 
+          data.email || `${data.username}@example.com`,
+          data.displayName || data.username
+        );
       }
     } catch (error: any) {
       toast({
@@ -69,6 +78,39 @@ export default function AuthPage() {
                 </p>
               )}
             </div>
+
+            {!isLogin && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email (optional)</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    {...form.register("email")}
+                    disabled={isPending}
+                  />
+                  {form.formState.errors.email && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.email.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display Name (optional)</Label>
+                  <Input
+                    id="displayName"
+                    {...form.register("displayName")}
+                    disabled={isPending}
+                  />
+                  {form.formState.errors.displayName && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.displayName.message}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

@@ -43,19 +43,42 @@ const store = new MemoryStore({
 
 // Create session middleware
 export const sessionMiddleware = session({
-  secret: process.env.REPL_ID || "chat-genius-session-secret",
+  secret: process.env.SESSION_SECRET || "chat-genius-session-secret",
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   },
   store
 });
 
 export function setupAuth(app: Express) {
+  // Enable CORS with credentials
+  app.use((req, res, next) => {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'https://chat-genius-new.vercel.app',
+      'https://chat-genius-new.onrender.com',
+      process.env.FRONTEND_URL,
+    ].filter(Boolean);
+
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   if (app.get("env") === "production") {
     app.set("trust proxy", 1); // trust first proxy
   }

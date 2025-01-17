@@ -3,23 +3,23 @@ import type { SelectUser } from "@db/schema";
 import { useLocation } from 'wouter';
 
 async function fetchUser(): Promise<SelectUser | null> {
-  const response = await fetch('/api/user', {
-    credentials: 'include'
-  });
+  try {
+    const response = await fetch('/api/user', {
+      credentials: 'include'
+    });
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      return null;
+    if (!response.ok) {
+      if (response.status === 401) {
+        return null;
+      }
+      throw new Error(`${response.status}: ${await response.text()}`);
     }
 
-    if (response.status >= 500) {
-      throw new Error(`${response.status}: ${response.statusText}`);
-    }
-
-    throw new Error(`${response.status}: ${await response.text()}`);
+    return response.json();
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
   }
-
-  return response.json();
 }
 
 export function useUser() {
@@ -30,30 +30,52 @@ export function useUser() {
     queryKey: ['/api/user'],
     queryFn: fetchUser,
     retry: false,
-    staleTime: 0, // Set to 0 to always fetch fresh data when component mounts
+    staleTime: 0,
   });
 
   const authMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string; isLogin: boolean }) => {
-      const response = await fetch(`/api/${data.isLogin ? 'login' : 'register'}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: 'include',
-      });
+    mutationFn: async (data: { 
+      username: string; 
+      password: string; 
+      email?: string;
+      displayName?: string;
+      isLogin: boolean;
+    }) => {
+      try {
+        console.log('Attempting auth:', data.isLogin ? 'login' : 'register');
+        const response = await fetch(`/api/${data.isLogin ? 'login' : 'register'}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          credentials: 'include',
+        });
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
+        const responseText = await response.text();
+        console.log('Auth response:', response.status, responseText);
+
+        if (!response.ok) {
+          throw new Error(responseText || 'Authentication failed');
+        }
+
+        try {
+          return JSON.parse(responseText);
+        } catch {
+          return responseText;
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
+        throw error;
       }
-
-      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Auth success:', data);
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      setLocation('/'); // Redirect to home after successful auth
-      window.location.reload(); // Refresh the page after login
+      setLocation('/');
+      window.location.reload();
     },
+    onError: (error) => {
+      console.error('Auth mutation error:', error);
+    }
   });
 
   const logoutMutation = useMutation({
@@ -69,7 +91,7 @@ export function useUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      setLocation('/'); // Redirect to home after logout
+      setLocation('/');
     },
   });
 
@@ -78,8 +100,14 @@ export function useUser() {
     isLoading,
     login: (username: string, password: string) => 
       authMutation.mutate({ username, password, isLogin: true }),
-    register: (username: string, password: string) =>
-      authMutation.mutate({ username, password, isLogin: false }),
+    register: (username: string, password: string, email?: string, displayName?: string) =>
+      authMutation.mutate({ 
+        username, 
+        password, 
+        email: email || `${username}@example.com`,
+        displayName: displayName || username,
+        isLogin: false 
+      }),
     logout: () => logoutMutation.mutate(),
     isPending: authMutation.isPending || logoutMutation.isPending,
   };
