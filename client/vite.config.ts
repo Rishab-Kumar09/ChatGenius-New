@@ -7,7 +7,12 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 export default defineConfig({
   plugins: [react(), runtimeErrorOverlay()],
   css: {
-    postcss: './postcss.config.cjs'
+    postcss: './postcss.config.cjs',
+    // Ensure CSS is properly extracted and minified
+    modules: {
+      localsConvention: 'camelCase',
+      scopeBehaviour: 'local',
+    }
   },
   server: {
     port: 5173,
@@ -52,8 +57,14 @@ export default defineConfig({
       }
     },
     // Ensure CSS is extracted and properly handled
-    cssCodeSplit: true,
-    sourcemap: true
+    cssCodeSplit: false,
+    sourcemap: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+      },
+    },
   },
   resolve: {
     alias: {
