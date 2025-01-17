@@ -324,7 +324,8 @@ export function MessageThread({
             "flex gap-3 hover:bg-muted/30 rounded transition-colors relative",
             indentLevel > 0 && "pl-6", // Add left padding for indented messages
             message.isFirstInGroup ? "pt-2" : "pt-0.5",
-            message.isLastInGroup ? "pb-2" : "pb-0.5"
+            message.isLastInGroup ? "pb-2" : "pb-0.5",
+            isBeingRepliedTo && "bg-accent/10" // Highlight when being replied to
           )}
           style={{ 
             marginLeft: `${marginLeft}px`,

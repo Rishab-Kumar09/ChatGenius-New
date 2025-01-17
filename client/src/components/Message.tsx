@@ -9,7 +9,7 @@ import {
 import { Button } from "./ui/button";
 import { UserAvatar } from "./UserAvatar";
 import { MessageReactions } from "./MessageReactions";
-import { formatTimestamp } from "../lib/formatters";
+import { formatTimestamp, formatFullTimestamp } from "../lib/formatters";
 import type { Message as MessageType } from "../types";
 
 interface MessageProps {
@@ -103,7 +103,7 @@ export function Message({ message, isLastInGroup }: MessageProps) {
           <span className="text-sm font-medium text-white">
             {message.sender.displayName || message.sender.username}
           </span>
-          <span className="text-xs text-white/50">
+          <span className="text-xs text-white/50" title={formatFullTimestamp(message.timestamp)}>
             {formatTimestamp(message.timestamp)}
           </span>
         </div>
