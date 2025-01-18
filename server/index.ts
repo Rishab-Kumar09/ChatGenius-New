@@ -5,31 +5,31 @@ import { initializeDatabase } from "@db";
 import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
+import cookieParser from 'cookie-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DIST_DIR = path.join(__dirname, '../../dist');
+const DIST_DIR = path.join(__dirname, '../dist');
 
-const ALLOWED_ORIGINS = [
-  'https://chat-genius-new.onrender.com',
-  'https://main.d2qm6cqq0orw0h.amplifyapp.com',
-  'http://localhost:5173',
-  'http://localhost:3000'
-];
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 async function startServer() {
   const app = express();
 
+  // Cookie parser middleware
+  app.use(cookieParser());
+
   // CORS configuration
   app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin && ALLOWED_ORIGINS.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    // In production, allow same-origin requests
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:3000');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
     }
-    if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
   });
 

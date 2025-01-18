@@ -38,49 +38,68 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE,
-        password_hash TEXT NOT NULL,
+        password TEXT NOT NULL,
         display_name TEXT,
+        email TEXT,
         avatar_url TEXT,
-        is_online BOOLEAN DEFAULT 0,
-        status TEXT DEFAULT 'offline',
-        is_typing BOOLEAN DEFAULT 0,
-        last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        about_me TEXT,
+        note TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS channels (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
+        name TEXT UNIQUE NOT NULL,
         description TEXT,
-        created_by INTEGER REFERENCES users(id),
-        is_direct BOOLEAN DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        is_private INTEGER DEFAULT 0 NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS channel_invitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        invitee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status TEXT DEFAULT 'pending' NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS channel_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT DEFAULT 'member' NOT NULL,
+        joined_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         content TEXT NOT NULL,
-        sender_id INTEGER REFERENCES users(id),
-        channel_id INTEGER REFERENCES channels(id),
-        recipient_id INTEGER REFERENCES users(id),
-        parent_id INTEGER REFERENCES messages(id),
-        file_url TEXT,
+        sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        recipient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        parent_id INTEGER,
+        reply_count INTEGER DEFAULT 0 NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        is_edited INTEGER DEFAULT 0 NOT NULL,
+        delivery_status TEXT DEFAULT 'sent' NOT NULL,
         file_name TEXT,
+        file_url TEXT,
         file_size INTEGER,
-        file_type TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        file_type TEXT
       );
 
-      CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id);
-      CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
-      CREATE INDEX IF NOT EXISTS idx_messages_recipient_id ON messages(recipient_id);
-      CREATE INDEX IF NOT EXISTS idx_messages_parent_id ON messages(parent_id);
-      CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-      CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
+      CREATE TABLE IF NOT EXISTS reactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
     `);
 
     console.log('Database initialized successfully');

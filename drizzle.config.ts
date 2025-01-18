@@ -1,13 +1,12 @@
-import { defineConfig } from "drizzle-kit";
+import type { Config } from 'drizzle-kit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-export default defineConfig({
-  schema: "./db/schema.ts",
-  out: "./migrations",
-  dialect: "sqlite",
-  driver: "better-sqlite3",
-  dbCredentials: {
-    url: "sqlite.db"
-  },
-  verbose: true,
-  strict: true
-});
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export default {
+  schema: './db/schema.ts',
+  out: './migrations',
+  dialect: 'sqlite',
+} satisfies Config;

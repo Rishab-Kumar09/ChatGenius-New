@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
 const API_URL = process.env.NODE_ENV === 'production' 
-  ? process.env.VITE_API_URL || 'https://chat-genius-new.onrender.com'
+  ? process.env.VITE_API_URL || ''
   : '';
 
 async function fetchUser(): Promise<SelectUser | null> {
