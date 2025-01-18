@@ -6,7 +6,6 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import cors from 'cors';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -17,17 +16,6 @@ async function startServer() {
 
   // Parse JSON bodies
   app.use(express.json());
-
-  // Add CORS middleware before routes
-  app.use(cors({
-    origin: [
-      'https://deployment.d6mohvmmiv3bp.amplifyapp.com',  // AWS Amplify frontend
-      'http://localhost:5173',  // Local development
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
-  }));
 
   // Initialize database and create tables
   await initializeDatabase();
@@ -40,10 +28,6 @@ async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     if (process.env.AWS_LAMBDA_FUNCTION_VERSION) {
       clientDistPath = '/opt/nodejs/dist/public';
-    } else if (process.env.RENDER) {
-      clientDistPath = path.join(process.env.RENDER_PROJECT_DIR || '', 'dist/public');
-    } else if (process.env.REPL_ID) {
-      clientDistPath = path.join(process.env.REPL_HOME || '', 'dist/public');
     } else {
       clientDistPath = path.join(__dirname, '../dist/public');
     }
@@ -53,11 +37,7 @@ async function startServer() {
 
   console.log('Environment variables:', {
     NODE_ENV: process.env.NODE_ENV,
-    AWS_LAMBDA_FUNCTION_VERSION: process.env.AWS_LAMBDA_FUNCTION_VERSION,
-    RENDER: process.env.RENDER,
-    RENDER_PROJECT_DIR: process.env.RENDER_PROJECT_DIR,
-    REPL_ID: process.env.REPL_ID,
-    REPL_HOME: process.env.REPL_HOME
+    AWS_LAMBDA_FUNCTION_VERSION: process.env.AWS_LAMBDA_FUNCTION_VERSION
   });
   
   console.log('Initial static files path:', clientDistPath);
@@ -74,12 +54,6 @@ async function startServer() {
       '/opt/nodejs/dist/public',
       '/var/task/dist/public',
       path.join(process.env.LAMBDA_TASK_ROOT || '', 'dist/public'),
-      // Render paths
-      path.join(process.env.RENDER_PROJECT_DIR || '', 'dist/public'),
-      path.join(process.env.RENDER_PROJECT_DIR || '', 'public'),
-      // Replit paths
-      path.join(process.env.REPL_HOME || '', 'dist/public'),
-      path.join(process.env.REPL_HOME || '', 'public'),
       // Additional common paths
       path.resolve(__dirname, '../client/dist'),
       path.resolve(__dirname, '../public'),
@@ -144,12 +118,7 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log('Environment:', process.env.NODE_ENV);
-    console.log('Platform:', 
-      process.env.AWS_LAMBDA_FUNCTION_VERSION ? 'AWS' : 
-      process.env.RENDER ? 'Render' : 
-      process.env.REPL_ID ? 'Replit' : 
-      'Other'
-    );
+    console.log('Platform:', process.env.AWS_LAMBDA_FUNCTION_VERSION ? 'AWS' : 'Other');
     console.log('Static files being served from:', clientDistPath);
   });
 }

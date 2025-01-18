@@ -7,7 +7,7 @@ frontend:
         - npm ci
     build:
       commands:
-        - VITE_API_URL=https://chat-genius-new.onrender.com npm run build
+        - VITE_API_URL=https://deployment.d6mohvmmiv3bp.amplifyapp.com npm run build
   artifacts:
     baseDirectory: dist/public
     files:
