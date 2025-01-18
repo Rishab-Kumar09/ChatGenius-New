@@ -60,19 +60,6 @@ export const sessionMiddleware = session({
 });
 
 export function setupAuth(app: Express) {
-  // Enable CORS with credentials before any route handlers
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'https://deployment.d6mohvmmiv3bp.amplifyapp.com');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
-    next();
-  });
-
   // Trust proxy in production
   if (app.get("env") === "production") {
     app.set('trust proxy', true);
