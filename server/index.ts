@@ -6,6 +6,7 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import cors from 'cors';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -16,6 +17,12 @@ async function startServer() {
 
   // Parse JSON bodies
   app.use(express.json());
+
+  // Add CORS middleware before routes
+  app.use(cors({
+    origin: 'http://localhost:5173', // Your frontend URL
+    credentials: true
+  }));
 
   // Add headers to allow CORS
   app.use((req, res, next) => {
