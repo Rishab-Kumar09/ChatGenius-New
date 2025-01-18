@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+!.env.production
+node_modules
+client/node_modules
+.vscode
+*.log
+.DS_Store 
