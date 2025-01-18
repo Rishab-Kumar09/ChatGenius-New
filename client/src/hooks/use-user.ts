@@ -3,8 +3,9 @@ import type { SelectUser } from "@db/schema";
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
+// In production, use the current origin since we're serving from the same domain
 const API_URL = process.env.NODE_ENV === 'production' 
-  ? process.env.VITE_API_URL || ''
+  ? window.location.origin
   : '';
 
 async function fetchUser(): Promise<SelectUser | null> {
