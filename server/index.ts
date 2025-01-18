@@ -23,7 +23,6 @@ async function startServer() {
     origin: [
       'https://deployment.d6mohvmmiv3bp.amplifyapp.com',  // AWS Amplify frontend
       'http://localhost:5173',  // Local development
-      'https://chat-genius-new.onrender.com'  // Render backend (if needed)
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
