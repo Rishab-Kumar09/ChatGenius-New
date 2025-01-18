@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 // Get the API URL from environment or fallback to localhost
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
@@ -9,15 +8,7 @@ const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:3000';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), runtimeErrorOverlay()],
-  css: {
-    postcss: './postcss.config.cjs',
-    // Ensure CSS is properly extracted and minified
-    modules: {
-      localsConvention: 'camelCase',
-      scopeBehaviour: 'local',
-    }
-  },
+  plugins: [react()],
   server: {
     port: 5173,
     host: true,
@@ -45,35 +36,26 @@ export default defineConfig({
   },
   build: {
     outDir: process.env.AWS_LAMBDA_FUNCTION_VERSION 
-      ? '/opt/nodejs/dist/public'
+      ? '/opt/nodejs/dist'
       : process.env.RENDER 
-        ? path.join(process.env.RENDER_PROJECT_DIR || '', 'dist/public')
+        ? path.join(process.env.RENDER_PROJECT_DIR || '', 'dist')
         : process.env.REPL_ID
-          ? path.join(process.env.REPL_HOME || '', 'dist/public')
-          : '../dist/public',
+          ? path.join(process.env.REPL_HOME || '', 'dist')
+          : '../dist',
     emptyOutDir: true,
-    assetsDir: 'assets',
+    sourcemap: true,
     rollupOptions: {
       output: {
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash][extname]'
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'wouter'],
+          ui: ['@radix-ui/react-toast', '@radix-ui/react-dialog'],
+        },
       }
-    },
-    // Ensure CSS is extracted and properly handled
-    cssCodeSplit: false,
-    sourcemap: true,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-      },
     },
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@db": path.resolve(__dirname, "../db"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
 }) 
