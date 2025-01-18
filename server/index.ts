@@ -109,16 +109,10 @@ async function startServer() {
 
   // CORS configuration
   app.use(cors({
-    origin: [
-      'http://localhost:5173',
-      'https://deployment.domohvmmiv3bp.amplifyapp.com',
-      'http://deployment.domohvmmiv3bp.amplifyapp.com',
-      'https://chat-genius-new.onrender.com',
-      'http://chat-genius-new.onrender.com'
-    ],
+    origin: true, // Allow all origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Access-Control-Allow-Origin']
   }));
 
   // Enable pre-flight requests for all routes
