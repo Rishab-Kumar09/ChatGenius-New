@@ -51,9 +51,9 @@ export const sessionMiddleware = session({
   store,
   name: 'connect.sid',
   cookie: {
-    secure: false, // Set to false for local development
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'lax', // Changed to lax for local development
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
   }
@@ -62,7 +62,7 @@ export const sessionMiddleware = session({
 export function setupAuth(app: Express) {
   // Trust proxy in production
   if (app.get("env") === "production") {
-    app.set('trust proxy', true);
+    app.set('trust proxy', 1);
   }
 
   // Add cookie parser before session middleware
