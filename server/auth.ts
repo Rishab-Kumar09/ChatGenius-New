@@ -62,28 +62,13 @@ export const sessionMiddleware = session({
 export function setupAuth(app: Express) {
   // Enable CORS with credentials before any route handlers
   app.use((req, res, next) => {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'https://chat-genius-new.vercel.app',
-      'https://chat-genius-new.onrender.com',
-      'https://chat-genius-new.netlify.app',
-      process.env.FRONTEND_URL,
-    ].filter(Boolean);
-
-    const origin = req.headers.origin || req.get('origin') || req.headers.referer || null;
-    console.log('Request origin:', origin);
+    res.header('Access-Control-Allow-Origin', 'https://deployment.d6mohvmmiv3bp.amplifyapp.com');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
     
-    if (origin && typeof origin === 'string' && allowedOrigins.some(allowed => allowed && origin.startsWith(allowed))) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      console.log('CORS headers set for origin:', origin);
-    }
-
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      return res.status(200).end();
     }
     next();
   });
