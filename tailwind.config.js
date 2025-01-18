@@ -1,9 +1,13 @@
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   content: [
-    "./src/**/*.{js,jsx,ts,tsx}",
-    "./index.html",
+    "./client/src/**/*.{js,jsx,ts,tsx}",
+    "./client/index.html",
+    "./dist/public/**/*.{html,js}",
+    "./client/dist/**/*.{html,js}",
+    "./public/**/*.{html,js}"
   ],
+  darkMode: ["class"],
   theme: {
     extend: {
       colors: {
@@ -11,6 +15,9 @@ module.exports = {
       }
     }
   },
-  plugins: [],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography")
+  ]
 }
 
