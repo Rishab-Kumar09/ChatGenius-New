@@ -112,11 +112,13 @@ async function startServer() {
     origin: [
       'http://localhost:5173',
       'https://deployment.domohvmmiv3bp.amplifyapp.com',
-      'http://deployment.domohvmmiv3bp.amplifyapp.com'
+      'http://deployment.domohvmmiv3bp.amplifyapp.com',
+      'https://chat-genius-new.onrender.com',
+      'http://chat-genius-new.onrender.com'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
   }));
 
   // Enable pre-flight requests for all routes
