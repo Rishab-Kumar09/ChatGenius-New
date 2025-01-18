@@ -1,16 +1,19 @@
+const API_CONFIG = {
+  production: 'https://main.d2qm6cqq0orw0h.amplifyapp.com',
+  development: ''
+} as const;
+
 export const defaultOptions: RequestInit = {
   credentials: 'include',
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Cache-Control': 'no-cache',
-    'X-Requested-With': 'XMLHttpRequest'
-  },
+    'Accept': 'application/json'
+  }
 };
 
 export const baseURL = process.env.NODE_ENV === 'production' 
-  ? process.env.VITE_API_URL || 'https://main.d2qm6cqq0orw0h.amplifyapp.com'
-  : '';
+  ? process.env.VITE_API_URL || API_CONFIG.production
+  : API_CONFIG.development;
 
 export async function fetchApi<T = any>(
   endpoint: string,
@@ -25,23 +28,11 @@ export async function fetchApi<T = any>(
     },
   };
 
-  console.log('Making API request:', {
-    url: `${baseURL}${endpoint}`,
-    options: mergedOptions,
-    environment: process.env.NODE_ENV,
-    apiUrl: process.env.VITE_API_URL
-  });
-
   const response = await fetch(`${baseURL}${endpoint}`, mergedOptions);
   
   if (!response.ok) {
-    console.error('API request failed:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'An error occurred');
+    throw new Error(error.message || `API request failed: ${response.status}`);
   }
 
   return response.json();

@@ -27,8 +27,7 @@ applications:
             value: 'no-cache'
           - key: 'X-Frame-Options'
             value: 'DENY'
-    environmentVariables:
-      - name: NODE_ENV
-        value: production
-      - name: PORT
-        value: 3000 
+    environment:
+      variables:
+        - name: NODE_ENV
+          value: production 
