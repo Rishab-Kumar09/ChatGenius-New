@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+// Get the API URL from environment or fallback to localhost
+const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
+const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:3000';
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), runtimeErrorOverlay()],
@@ -19,7 +23,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: API_URL,
         changeOrigin: true,
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
@@ -34,7 +38,7 @@ export default defineConfig({
         },
       },
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: WS_URL,
         ws: true,
       },
     },

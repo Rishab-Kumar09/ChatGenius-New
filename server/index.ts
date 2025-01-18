@@ -6,6 +6,7 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import cors from 'cors';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -105,6 +106,21 @@ async function startServer() {
       }
     }
   }));
+
+  // CORS configuration
+  app.use(cors({
+    origin: [
+      'http://localhost:5173',
+      'https://deployment.domohvmmiv3bp.amplifyapp.com',
+      'http://deployment.domohvmmiv3bp.amplifyapp.com'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  }));
+
+  // Enable pre-flight requests for all routes
+  app.options('*', cors());
 
   // Register API routes and get HTTP server instance
   const server = registerRoutes(app);

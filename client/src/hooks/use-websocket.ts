@@ -21,10 +21,10 @@ export function useWebSocket() {
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = import.meta.env.DEV 
-      ? `ws://localhost:3000/ws`
-      : `${protocol}//${window.location.host}/ws`;
+    const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:3000';
+    const wsUrl = import.meta.env.PROD
+      ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
+      : `${WS_URL}/ws`;
     
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
