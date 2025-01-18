@@ -6,7 +6,7 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import cors from 'cors';
+//import cors from 'cors';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -19,30 +19,30 @@ async function startServer() {
   app.use(express.json());
 
   // Add CORS middleware before routes
-  app.use(cors({
-    origin: [
-      'https://deployment.d6mohvmmiv3bp.amplifyapp.com',  // Your deployed frontend
-      'http://localhost:5173'  // Local development
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-  }));
+  // app.use(cors({
+  //   origin: [
+  //     'https://deployment.d6mohvmmiv3bp.amplifyapp.com',  // Your deployed frontend
+  //     'http://localhost:5173'  // Local development
+  //   ],
+  //   credentials: true,
+  //   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  // }));
 
-  // Add headers to allow CORS
-  app.use((req, res, next) => {
-    // Set CORS headers
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', '*');
-    res.header('Access-Control-Allow-Headers', '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
+  // // Add headers to allow CORS
+  // app.use((req, res, next) => {
+  //   // Set CORS headers
+  //   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  //   res.header('Access-Control-Allow-Methods', '*');
+  //   res.header('Access-Control-Allow-Headers', '*');
+  //   res.header('Access-Control-Allow-Credentials', 'true');
     
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
+  //   // Handle preflight requests
+  //   if (req.method === 'OPTIONS') {
+  //     return res.status(200).end();
+  //   }
 
-    next();
-  });
+  //   next();
+  // });
 
   // Initialize database and create tables
   await initializeDatabase();
