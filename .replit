@@ -1,0 +1,13 @@
+run = "npm run start"
+hidden = [".build", ".config"]
+
+[env]
+PORT = "3000"
+NODE_ENV = "production"
+
+[nix]
+channel = "stable-22_11"
+
+[deployment]
+run = ["sh", "-c", "npm run start"]
+deploymentTarget = "cloudrun" 

@@ -21,21 +21,26 @@ export default defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist"),
-    emptyOutDir: true,
+    outDir: path.resolve(__dirname, "dist/public"),
+    emptyOutDir: true
   },
   server: {
+    host: '0.0.0.0',
+    port: 3000,
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': {
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        changeOrigin: true,
+      },
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: process.env.VITE_API_URL || 'ws://localhost:3000',
         ws: true,
+        changeOrigin: true,
       }
     },
     hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: 24678
+      clientPort: 443,
+      protocol: 'wss'
     },
   },
 });

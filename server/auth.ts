@@ -56,10 +56,6 @@ export const sessionMiddleware = session({
 });
 
 export function setupAuth(app: Express) {
-  if (app.get("env") === "production") {
-    app.set("trust proxy", 1); // trust first proxy
-  }
-
   app.use(sessionMiddleware);
   app.use(passport.initialize());
   app.use(passport.session());

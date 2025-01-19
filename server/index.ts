@@ -6,7 +6,6 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 
-// ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -22,26 +21,32 @@ async function startServer() {
   // Run database seeding
   await seedDatabase();
 
-  // Serve static files from the client build directory
-  const clientDistPath = path.join(__dirname, '../dist/public');
-  app.use(express.static(clientDistPath));
+  // Serve static files in production
+  if (process.env.NODE_ENV === 'production') {
+    const clientDistPath = path.join(__dirname, '../dist/public');
+    app.use(express.static(clientDistPath));
+  }
 
   // Register API routes and get HTTP server instance
   const server = registerRoutes(app);
 
-  // Handle client-side routing - serve index.html for all non-API routes
-  app.get('*', (req, res) => {
-    // Don't handle API routes
-    if (req.url.startsWith('/api/')) {
-      return res.status(404).send('Not found');
-    }
-    res.sendFile(path.join(clientDistPath, 'index.html'));
-  });
+  // Handle client-side routing in production
+  if (process.env.NODE_ENV === 'production') {
+    const clientDistPath = path.join(__dirname, '../dist/public');
+    app.get('*', (req, res) => {
+      if (req.url.startsWith('/api/')) {
+        return res.status(404).send('Not found');
+      }
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    });
+  }
 
   // Start server
   const port = process.env.PORT || 3000;
-  server.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+  
+  server.listen({ port, host }, () => {
+    console.log(`Server running on ${host}:${port} in ${process.env.NODE_ENV || 'development'} mode`);
   });
 }
 
