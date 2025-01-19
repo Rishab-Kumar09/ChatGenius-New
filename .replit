@@ -1,12 +1,28 @@
-run = "npm run start"
+run = "npm run dev"
 hidden = [".build", ".config"]
 
 [env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
+XDG_CONFIG_HOME = "/home/runner/.config"
 PORT = "3000"
-NODE_ENV = "production"
+NODE_ENV = "development"
 
 [nix]
 channel = "stable-22_11"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+
+[languages.javascript]
+pattern = "**/{*.js,*.jsx,*.ts,*.tsx}"
+
+[languages.javascript.languageServer]
+start = [ "typescript-language-server", "--stdio" ]
 
 [deployment]
 run = ["sh", "-c", "npm run start"]

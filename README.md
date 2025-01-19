@@ -1,31 +1,8 @@
 # ChatGenius
 
-ChatGenius is a modern real-time chat application designed for seamless team communication. Built with TypeScript and React, it offers a rich set of features for both direct messaging and channel-based conversations.
+A modern chat application built with React, Express, and TypeScript, featuring real-time messaging and AI-powered conversations.
 
 ## Features
-
-* 💬 Real-time messaging with Server-Sent Events (SSE)
-* 👥 Public and private channels with member management
-* 📝 Rich message formatting and file attachments
-* 👤 User profiles with customizable avatars
-* 🔍 Message search functionality
-* 📱 Responsive design for desktop and mobile
-* 🌙 Dark theme UI with modern aesthetics
-* 🔒 Secure authentication system
-* 🎯 Message reactions and replies
-* 📎 File sharing with preview support
-* 👋 User presence indicators
-* 🔔 Real-time notifications
-
-## Technical Stack
-
-### Frontend
-* **Framework**: React with TypeScript
-* **Build Tool**: Vite
-* **UI Components**: shadcn/ui + Tailwind CSS
-* **State Management**: React Query
-* **Real-time Updates**: Server-Sent Events (SSE)
-* **Form Handling**: React Hook Form + Zod validation
 
 ### Backend
 * **Server**: Express.js with TypeScript
@@ -35,35 +12,25 @@ ChatGenius is a modern real-time chat application designed for seamless team com
 * **Authentication**: Session-based with Passport.js
 * **API Design**: RESTful architecture
 
-## Key Features in Detail
-
-### Messaging System
-* Real-time message delivery
-* Message reactions with emojis
-* Reply threading support
-* File attachments with previews
-* Message edit and delete functionality
-
-### Channel Management
-* Create public/private channels
-* Member count display
-* Member list with roles
-* Channel join/leave functionality
-* Channel invitations system
-
-### User Experience
-* Sleek dark theme interface
-* Responsive sidebar design
-* Fixed message input with proper spacing
-* Smooth scrolling with custom scrollbars
-* Loading states and error handling
+### Frontend
+* **Framework**: React with TypeScript
+* **Styling**: Tailwind CSS with shadcn/ui components
+* **State Management**: React Query
+* **Routing**: Wouter
+* **Real-time**: WebSocket for live updates
 
 ## Getting Started
 
+### Prerequisites
+- Node.js 18 or higher
+- npm or yarn
+
+### Local Development
+
 1. Clone the repository:
 ```bash
-git clone https://github.com/Rishab-Kumar09/ChatGenius-New.git
-cd ChatGenius-New
+git clone https://github.com/your-username/ChatGenius.git
+cd ChatGenius
 ```
 
 2. Install dependencies:
@@ -74,9 +41,15 @@ npm install
 3. Set up environment variables:
 Create a `.env` file with:
 ```env
-PORT=5000
+PORT=3000
 NODE_ENV=development
-SESSION_SECRET=your_session_secret
+SESSION_SECRET=your-session-secret
+VITE_API_URL=http://localhost:3000
+Langchain_API_key=your-langchain-key
+Pinecone_API_Key=your-pinecone-key
+OpenAI_API_Key=your-openai-key
+PINECONE_INDEX=your-pinecone-index
+PINECONE_INDEX_TWO=your-pinecone-index-two
 ```
 
 4. Initialize the database:
@@ -89,10 +62,30 @@ npm run db:push
 npm run dev
 ```
 
-The application will be available at `http://localhost:5000`.
+### Production Build
+
+1. Build the application:
+```bash
+npm run build
+```
+
+2. Start the production server:
+```bash
+npm run start
+```
+
+## Deployment
+
+### Deploying to Replit
+
+1. Create a new Repl and import from GitHub
+2. Set up environment variables in Replit Secrets
+3. Run `npm install` and `npm run build`
+4. Click "Run" to start the server
+
+The application will be available at your Repl's URL.
 
 ## Project Structure
-
 ```
 ChatGenius/
 ├── client/                 # Frontend React application
@@ -110,15 +103,6 @@ ChatGenius/
 └── migrations/           # Database migrations
 ```
 
-## Security Features
-
-* Session-based authentication
-* Password hashing
-* CSRF protection
-* Secure file upload handling
-* Input validation
-* XSS prevention
-
 ## Contributing
 
 1. Fork the repository
@@ -129,8 +113,4 @@ ChatGenius/
 
 ## License
 
-This project is licensed under the MIT License.
-
-## Author
-
-ChatGenius is developed by Rishab Kumar.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

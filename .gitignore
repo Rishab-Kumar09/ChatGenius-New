@@ -6,12 +6,17 @@
 # Testing
 /coverage
 
+# Production
+/dist
+/build
+
 # Misc
 .DS_Store
 .env
 .env.local
 .env.development.local
 .env.test.local
+.env.production.local
 
 # Debug logs
 npm-debug.log*
@@ -31,7 +36,16 @@ yarn-error.log*
 # Database
 *.db
 *.db-journal
+*.sqlite
+*.sqlite3
 
 # Environment variables
 .env*
 !.env.example
+
+# Replit specific
+.replit
+.cache/
+.config/
+.upm/
+.breakpoints
