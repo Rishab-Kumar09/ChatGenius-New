@@ -56,6 +56,7 @@ export const sessionMiddleware = session({
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
+    domain: process.env.NODE_ENV === 'production' ? '.amplifyapp.com' : undefined
   }
 });
 
@@ -68,6 +69,7 @@ export function setupAuth(app: Express) {
   // Add cookie parser before session middleware
   app.use(cookieParser());
 
+  // Session and passport middleware
   app.use(sessionMiddleware);
   app.use(passport.initialize());
   app.use(passport.session());
@@ -84,46 +86,7 @@ export function setupAuth(app: Express) {
     next();
   });
 
-  passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      try {
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, username))
-          .limit(1);
-
-        if (!user) {
-          return done(null, false, { message: "Incorrect username." });
-        }
-        const isMatch = await crypto.compare(password, user.password);
-        if (!isMatch) {
-          return done(null, false, { message: "Incorrect password." });
-        }
-        return done(null, user);
-      } catch (err) {
-        return done(err);
-      }
-    })
-  );
-
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(async (id: number, done) => {
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, id))
-        .limit(1);
-      done(null, user);
-    } catch (err) {
-      done(err);
-    }
-  });
-
+  // Authentication routes
   app.post("/api/register", async (req, res, next) => {
     try {
       const { username, password } = req.body;
@@ -154,27 +117,6 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      // Get Sarah's user ID
-      const [sarah] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, 'ai-assistant'))
-        .limit(1);
-
-      if (sarah) {
-        console.log('Sending initial message from Sarah to new user:', newUser.username);
-        // Send initial message from Sarah
-        await db
-          .insert(messages)
-          .values({
-            content: "Hi! I'm Sarah Thompson, a financial analyst specializing in Berkshire Hathaway. I've spent years studying Warren Buffett's investment philosophy through the annual letters. I'd be happy to help you understand Berkshire's business and investment strategies - just ask me anything!",
-            senderId: sarah.id,
-            recipientId: newUser.id
-          })
-          .returning();
-        console.log('Initial message sent successfully');
-      }
-
       // Log the user in after registration
       req.login(newUser, (err) => {
         if (err) {
@@ -191,58 +133,34 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    const { username, password } = req.body;
-    console.log('Login attempt for username:', username);
-      
-    if (!username || !password) {
-      return res.status(400).send("Username and password are required");
-    }
-
-    const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
+    passport.authenticate("local", (err: Error, user: Express.User | false, info: IVerifyOptions) => {
       if (err) {
-        console.error('Login error:', err);
         return next(err);
       }
-
       if (!user) {
-        console.log('Login failed:', info.message);
-        return res.status(400).send(info.message ?? "Login failed");
+        return res.status(401).send(info.message);
       }
-
-      req.logIn(user, (err) => {
+      req.login(user, (err) => {
         if (err) {
-          console.error('Login error:', err);
           return next(err);
         }
-
-        console.log('Login successful for user:', user.username);
-        return res.json({
-          message: "Login successful",
-          user
-        });
+        return res.json(user);
       });
-    };
-    passport.authenticate("local", cb)(req, res, next);
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).send("Logout failed");
-      }
-
-      res.json({ message: "Logout successful" });
+    req.logout(() => {
+      res.sendStatus(200);
     });
   });
 
   app.get("/api/user", (req, res) => {
     console.log('Checking auth status. Is authenticated:', req.isAuthenticated());
     console.log('Current user:', req.user);
-    
-    if (req.isAuthenticated()) {
-      return res.json(req.user);
+    if (!req.user) {
+      return res.status(401).json(null);
     }
-
-    res.status(401).send("Not logged in");
+    res.json(req.user);
   });
 }

@@ -6,6 +6,8 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import { setupAuth } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,25 +18,32 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 async function startServer() {
   const app = express();
 
-  // Cookie parser middleware
-  app.use(cookieParser());
+  // Trust proxy in production
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
 
-  // CORS configuration
-  app.use((req, res, next) => {
-    // In production, allow same-origin requests
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:3000');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
-
-  // Middleware
+  // Parse JSON bodies
   app.use(express.json());
+
+  // Configure CORS after session middleware
+  const corsOptions = {
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://chat-genius.amplifyapp.com']
+      : ['http://localhost:3000', 'http://localhost:5173'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  };
+
+  // Setup auth (includes session middleware)
+  setupAuth(app);
+
+  // Add CORS after session middleware
+  app.use(cors(corsOptions));
+
+  // Register routes (includes auth setup)
+  registerRoutes(app);
 
   // Database initialization
   await initializeDatabase();
@@ -42,9 +51,6 @@ async function startServer() {
 
   // Static files
   app.use(express.static(DIST_DIR));
-
-  // API routes
-  registerRoutes(app);
 
   // SPA fallback
   app.get('*', (req, res) => {
