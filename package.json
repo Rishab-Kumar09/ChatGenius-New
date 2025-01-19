@@ -59,6 +59,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "connect-sqlite3": "^0.9.15",
     "cookie-parser": "^1.4.6",
     "date-fns": "^3.6.0",
     "dotenv": "^16.4.7",

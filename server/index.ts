@@ -6,7 +6,8 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
-import { setupAuth } from './auth.js';
+import session from 'express-session';
+import { setupAuth, sessionConfig } from './auth';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,7 @@ async function startServer() {
   await initializeDatabase();
   await seedDatabase();
 
-  // Register routes (includes auth setup)
+  // Register API routes first
   registerRoutes(app);
 
   // Static files - serve frontend build
@@ -39,16 +40,27 @@ async function startServer() {
 
   // SPA fallback - serve index.html for all non-API routes
   app.get('*', (req, res, next) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(DIST_DIR, 'index.html'));
+    if (req.path.startsWith('/api')) {
+      // If it's an API route that wasn't handled, return 404
+      res.status(404).json({ error: 'API endpoint not found' });
     } else {
-      next();
+      // For all other routes, serve the SPA
+      res.sendFile(path.join(DIST_DIR, 'index.html'));
     }
   });
 
   // Error handling middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error('Error:', err);
+    // Log detailed error in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Detailed error:', {
+        message: err.message,
+        stack: err.stack,
+        path: req.path,
+        method: req.method
+      });
+    }
     res.status(err.status || 500).json({
       error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
     });

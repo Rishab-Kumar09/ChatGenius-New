@@ -9,6 +9,7 @@ import { users, insertUserSchema, type SelectUser, messages } from "@db/schema";
 import { db } from "@db";
 import { eq } from "drizzle-orm";
 import cookieParser from 'cookie-parser';
+import { SQLiteStore } from "connect-sqlite3";
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -58,6 +59,22 @@ export const sessionMiddleware = session({
     path: '/'
   }
 });
+
+export const sessionConfig = {
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    secure: false,
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  },
+  store: new SQLiteStore({
+    driver: db,
+    ttl: 24 * 60 * 60 // 24 hours in seconds
+  })
+};
 
 export function setupAuth(app: Express) {
   // Trust proxy in production
