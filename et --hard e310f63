@@ -1,0 +1,66 @@
+[33mb2f0557[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdeployment[m[33m, [m[1;31morigin/deployment[m[33m)[m Update session configuration and improve error handling
+[33m04e9a80[m Fix API URL handling and remove CORS for single-origin deployment
+[33m8c266d8[m Fix session handling and cookie configuration
+[33m505ebdf[m Add missing passport configuration
+[33me310f63[m Improve session and CORS security configuration
+[33m8d97e8d[m Fix session configuration for production
+[33m0d209d4[m Fix API URL in production to use current origin
+[33mb7cfef7[m Fix CORS and session handling in production mode
+[33mf1ed510[m Clean up configuration files and improve maintainability
+[33meac3f5a[m Fix CORS configuration for AWS deployment
+[33mb9e842a[m Update AWS Amplify configuration and build scripts
+[33m2cbb020[m Updated server and client configuration for deployment
+[33m442c15e[m Remove CORS and Render references
+[33ma7c0284[m Update API URL and CORS configuration
+[33m3f1dafe[m Update .gitignore
+[33maea50fe[m Simplify database configuration to use local SQLite storage
+[33m68301ec[m Add AWS deployment configuration files
+[33mdb66571[m Prepare for AWS deployment
+[33m3f8a859[m Comment out CORS configuration for testing
+[33m025eb61[m Update CORS configuration with specific allowed origins
+[33mc1d5572[m Update server configuration and fix deployment issues
+[33mbd75669[m Update CORS configuration and fix session handling
+[33m08532d7[m Simplify CORS configuration to allow all origins
+[33medbca04[m Add minimal CORS configuration for Amplify domain
+[33m890c047[m Add minimal CORS configuration for Amplify domain
+[33m55d7d0e[m Remove CORS configuration
+[33m6264099[m Allow all origins in CORS configuration for testing
+[33mbb0a30a[m Update CORS configuration to allow Render domain
+[33m130f409[m Update Tailwind configuration with proper content paths
+[33m7e6f08d[m Update CORS configuration for Amplify deployment
+[33m427c6c2[m Fix static file serving and database initialization
+[33ma1f4aaa[m Fix Tailwind CSS configuration and update styles
+[33me79b5f5[m Add hardcoded CSS and optimize build configuration
+[33mc560cb9[m Fix Tailwind CSS content configuration
+[33mdb110e2[m Add support for static file serving on Render and Replit
+[33m5425d4b[m Fix static file serving for AWS deployment
+[33mac24492[m Fix session handling and authentication issues
+[33m53b810a[m Fix authentication in production and improve registration form
+[33me5d1c89[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Update message thread with improved timestamp handling and UI enhancements
+[33mcdc393e[m Improve file upload and image display functionality: - Add multiple file upload support - Enhance image preview layout - Fix expanded image view sizing - Update file URL handling
+[33mfae2129[m Fix file upload and avatar functionality
+[33m9b13730[m Fix user profile functionality and improve error handling
+[33m62ccdfe[m Add user profile functionality and fix routing issues
+[33m8fd0db7[m feat: add spacing between users in sidebar DM section
+[33me1c223a[m Fix MessageThread component: Add null check for messages array and improve error handling
+[33m93d56f0[m Fix Sarah's responses in channels: Ensure responses to mentions are not threaded
+[33ma77058c[m Improve Sarah's reply functionality: - Fix thread structure in channels and DMs - Add message preview in replies - Ensure correct parentId handling for new messages vs replies
+[33m1d15bc5[m Enhance AI assistant threading: Add parentId to Sarah's responses to maintain thread structure in DMs and mentions
+[33m4aa0152[m Improve reply functionality and fix message input focus: - Add auto-focus to message input when replying - Fix query invalidation in DirectMessage component - Update static file serving configuration - Enhance error handling and toast messages
+[33m9e5ea8e[m fix: Sarah now responds to both DMs and mentions correctly
+[33m6d3b136[m fix: Ensure Sarah responds to both DMs and mentions
+[33m8157722[m fix: Consolidate Tailwind configs into single TypeScript config
+[33mce57370[m fix: Update Vite build output directory
+[33m489c249[m Sarah working now. fix: Update Tailwind config with proper color definitions and content paths
+[33mcafdd96[m fix: Update Tailwind config with proper color definitions and content paths
+[33m2d0eb3b[m Addeed mention feature for AI bot. And fix: Add WebSocket server state tracking and improve error handling
+[33m65a62b4[m feat: Enhance AI assistant functionality - Add initial DM on user registration - Improve AI personality and responses - Fix user authentication and message handling - Clean up database seeding process
+[33m072254f[m feat: Update Sarah's profile with professional persona
+[33m8ed7d00[m feat: Enhance AI assistant - Add Warren's AI persona - Make responses more human-like - Auto-join public channels
+[33mc9137fb[m feat: Enhance AI personality - Add warm, friendly personality traits - Enable natural responses to greetings - Maintain RAG for business queries
+[33m645a552[m chore: Update UI components and project configuration - Update Message and Sidebar components - Add PostCSS and Tailwind configurations - Update package dependencies
+[33mff43d01[m feat: Enhance RAG implementation - Add strict document-only responses - Improve error handling - Update system prompts
+[33ma292bef[m feat: Improve RAG implementation and error handling - Add strict document-only responses - Enhance error handling for API key issues - Update system prompts for better document context usage
+[33mbbfe328[m refactor: hide DocumentUpload button and add env example file
+[33m2dfa607[m Added RAG functionality with document processing and improved AI responses
+[33ma3730bc[m Initial commit with OpenAI integration and bug fixes
