@@ -66,6 +66,47 @@ export function setupAuth(app: Express) {
     app.set('trust proxy', 1);
   }
 
+  // Configure passport local strategy
+  passport.use(
+    new LocalStrategy(async (username, password, done) => {
+      try {
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, username))
+          .limit(1);
+
+        if (!user) {
+          return done(null, false, { message: "Incorrect username." });
+        }
+        const isMatch = await crypto.compare(password, user.password);
+        if (!isMatch) {
+          return done(null, false, { message: "Incorrect password." });
+        }
+        return done(null, user);
+      } catch (err) {
+        return done(err);
+      }
+    })
+  );
+
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+
+  passport.deserializeUser(async (id: number, done) => {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+      done(null, user);
+    } catch (err) {
+      done(err);
+    }
+  });
+
   // Add cookie parser before session middleware
   app.use(cookieParser());
 
