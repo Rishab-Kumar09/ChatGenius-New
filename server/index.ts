@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import { setupAuth, sessionConfig } from './auth';
+import cors from 'cors';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,6 +73,18 @@ async function startServer() {
       error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
     });
   });
+
+  // Update CORS configuration
+  app.use(cors({
+    origin: [
+      'https://chimerical-cassata-a69d3d.netlify.app',
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
 
   // Start server
   const port = process.env.PORT || 3000;
