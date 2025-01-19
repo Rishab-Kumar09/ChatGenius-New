@@ -2383,15 +2383,20 @@ async function startServer() {
   const app = express();
   app.use(cors({
     origin: true,
-    // Allow all origins in development
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"]
   }));
   app.use((req, res, next) => {
     res.header("Access-Control-Allow-Credentials", "true");
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,PATCH,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+    res.header("X-Content-Type-Options", "nosniff");
+    res.header("X-Frame-Options", "SAMEORIGIN");
+    res.header("X-XSS-Protection", "1; mode=block");
+    if (req.url.match(/\.(css|js|jpg|png|gif|ico)$/)) {
+      res.header("Cache-Control", "public, max-age=31536000");
+    }
     next();
   });
   app.use(express.json());
@@ -2399,7 +2404,17 @@ async function startServer() {
   await seedDatabase();
   if (process.env.NODE_ENV === "production") {
     const clientDistPath = path4.join(__dirname, "../dist/public");
-    app.use(express.static(clientDistPath));
+    app.use(express.static(clientDistPath, {
+      etag: true,
+      lastModified: true,
+      setHeaders: (res, path5) => {
+        if (path5.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        } else if (path5.match(/\.(css|js|jpg|png|gif|ico)$/)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000");
+        }
+      }
+    }));
   }
   const server = registerRoutes(app);
   if (process.env.NODE_ENV === "production") {

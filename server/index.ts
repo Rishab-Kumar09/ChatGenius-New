@@ -15,17 +15,29 @@ async function startServer() {
 
   // Configure CORS
   app.use(cors({
-    origin: true, // Allow all origins in development
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
   }));
 
-  // Add security headers
+  // Add security headers for all routes
   app.use((req, res, next) => {
+    // Basic security headers
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+    
+    // Additional security headers
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('X-Frame-Options', 'SAMEORIGIN');
+    res.header('X-XSS-Protection', '1; mode=block');
+    
+    // Cache control for static assets
+    if (req.url.match(/\.(css|js|jpg|png|gif|ico)$/)) {
+      res.header('Cache-Control', 'public, max-age=31536000'); // 1 year
+    }
+    
     next();
   });
 
@@ -41,7 +53,17 @@ async function startServer() {
   // Serve static files in production
   if (process.env.NODE_ENV === 'production') {
     const clientDistPath = path.join(__dirname, '../dist/public');
-    app.use(express.static(clientDistPath));
+    app.use(express.static(clientDistPath, {
+      etag: true,
+      lastModified: true,
+      setHeaders: (res, path) => {
+        if (path.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (path.match(/\.(css|js|jpg|png|gif|ico)$/)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+        }
+      }
+    }));
   }
 
   // Register API routes and get HTTP server instance
