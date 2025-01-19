@@ -6,14 +6,11 @@ import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
-import cors from 'cors';
 import { setupAuth } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, '../dist');
-
-const isDevelopment = process.env.NODE_ENV === 'development';
 
 async function startServer() {
   const app = express();
@@ -25,38 +22,36 @@ async function startServer() {
 
   // Parse JSON bodies
   app.use(express.json());
-
-  // Configure CORS after session middleware
-  const corsOptions = {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ['https://chat-genius.amplifyapp.com']
-      : ['http://localhost:3000', 'http://localhost:5173'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  };
+  app.use(express.urlencoded({ extended: true }));
 
   // Setup auth (includes session middleware)
   setupAuth(app);
-
-  // Add CORS after session middleware
-  app.use(cors(corsOptions));
-
-  // Register routes (includes auth setup)
-  registerRoutes(app);
 
   // Database initialization
   await initializeDatabase();
   await seedDatabase();
 
-  // Static files
+  // Register routes (includes auth setup)
+  registerRoutes(app);
+
+  // Static files - serve frontend build
   app.use(express.static(DIST_DIR));
 
-  // SPA fallback
-  app.get('*', (req, res) => {
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
     if (!req.path.startsWith('/api')) {
       res.sendFile(path.join(DIST_DIR, 'index.html'));
+    } else {
+      next();
     }
+  });
+
+  // Error handling middleware
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Error:', err);
+    res.status(err.status || 500).json({
+      error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
+    });
   });
 
   // Start server

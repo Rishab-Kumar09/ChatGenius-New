@@ -1355,14 +1355,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.get("/api/user", (req, res) => {
-    if (req.isAuthenticated()) {
-      return res.json(req.user);
-    }
-
-    res.status(401).send("Not logged in");
-  });
-
   // Get user by ID
   app.get("/api/users/:id", async (req, res) => {
     console.log('Fetching user profile:', { id: req.params.id });

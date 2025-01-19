@@ -3,14 +3,12 @@ import type { SelectUser } from "@db/schema";
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 
-// In production, use the current origin since we're serving from the same domain
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? window.location.origin
-  : '';
+// Always use relative URLs since we're serving from the same origin
+const API_URL = '';
 
 async function fetchUser(): Promise<SelectUser | null> {
   try {
-    const response = await fetch(`${API_URL}/api/user`, {
+    const response = await fetch('/api/user', {
       credentials: 'include',
       headers: {
         'Accept': 'application/json',
@@ -22,13 +20,16 @@ async function fetchUser(): Promise<SelectUser | null> {
       if (response.status === 401) {
         return null;
       }
+      if (response.status >= 500) {
+        throw new Error(`${response.status}: ${response.statusText}`);
+      }
       throw new Error(`${response.status}: ${await response.text()}`);
     }
 
     return response.json();
   } catch (error) {
     console.error('Error fetching user:', error);
-    return null;
+    throw error;
   }
 }
 
