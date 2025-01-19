@@ -35,17 +35,24 @@ async function startServer() {
   // Register API routes first
   registerRoutes(app);
 
-  // Static files - serve frontend build
-  app.use(express.static(DIST_DIR));
+  // Serve static files from the React app
+  app.use(express.static(DIST_DIR, {
+    index: false // Don't auto-serve index.html
+  }));
 
   // SPA fallback - serve index.html for all non-API routes
-  app.get('*', (req, res, next) => {
+  app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) {
       // If it's an API route that wasn't handled, return 404
       res.status(404).json({ error: 'API endpoint not found' });
     } else {
       // For all other routes, serve the SPA
-      res.sendFile(path.join(DIST_DIR, 'index.html'));
+      res.sendFile(path.join(DIST_DIR, 'index.html'), (err) => {
+        if (err) {
+          console.error('Error sending index.html:', err);
+          res.status(500).send('Error loading application');
+        }
+      });
     }
   });
 
