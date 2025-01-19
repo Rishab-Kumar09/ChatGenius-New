@@ -43,16 +43,17 @@ const store = new MemoryStore({
 
 // Create session middleware
 export const sessionMiddleware = session({
-  secret: process.env.REPL_ID || "chat-genius-session-secret",
-  resave: false,
-  saveUninitialized: false,
+  secret: process.env.SESSION_SECRET || "chat-genius-session-secret",
+  resave: true,
+  saveUninitialized: true,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // We'll handle this through proxy
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
-  store
+  store,
+  proxy: true // Trust the reverse proxy
 });
 
 export function setupAuth(app: Express) {

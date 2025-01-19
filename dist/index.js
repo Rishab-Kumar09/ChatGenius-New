@@ -275,17 +275,20 @@ var store = new MemoryStore({
   // prune expired entries every 24h
 });
 var sessionMiddleware = session({
-  secret: process.env.REPL_ID || "chat-genius-session-secret",
-  resave: false,
-  saveUninitialized: false,
+  secret: process.env.SESSION_SECRET || "chat-genius-session-secret",
+  resave: true,
+  saveUninitialized: true,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    secure: false,
+    // We'll handle this through proxy
     httpOnly: true,
     sameSite: "lax",
     maxAge: 24 * 60 * 60 * 1e3
     // 24 hours
   },
-  store
+  store,
+  proxy: true
+  // Trust the reverse proxy
 });
 function setupAuth(app) {
   app.use(sessionMiddleware);
@@ -2373,10 +2376,24 @@ async function seedDatabase() {
 // server/index.ts
 import path4 from "path";
 import { fileURLToPath } from "url";
+import cors from "cors";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path4.dirname(__filename);
 async function startServer() {
   const app = express();
+  app.use(cors({
+    origin: true,
+    // Allow all origins in development
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  }));
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,PATCH,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    next();
+  });
   app.use(express.json());
   await initializeDatabase();
   await seedDatabase();
@@ -2395,8 +2412,9 @@ async function startServer() {
     });
   }
   const port = process.env.PORT || 3e3;
-  server.listen(port, () => {
-    console.log(`Server running on port ${port} in ${process.env.NODE_ENV || "development"} mode`);
+  const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost";
+  server.listen({ port, host }, () => {
+    console.log(`Server running on ${host}:${port} in ${process.env.NODE_ENV || "development"} mode`);
   });
 }
 startServer().catch((error) => {

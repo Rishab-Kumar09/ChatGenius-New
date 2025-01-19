@@ -5,12 +5,29 @@ import { initializeDatabase } from "@db";
 import { seedDatabase } from "@db/seed";
 import path from "path";
 import { fileURLToPath } from 'url';
+import cors from 'cors';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+
+  // Configure CORS
+  app.use(cors({
+    origin: true, // Allow all origins in development
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+
+  // Add security headers
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    next();
+  });
 
   // Parse JSON bodies
   app.use(express.json());

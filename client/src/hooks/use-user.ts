@@ -4,7 +4,11 @@ import { useLocation } from 'wouter';
 
 async function fetchUser(): Promise<SelectUser | null> {
   const response = await fetch('/api/user', {
-    credentials: 'include'
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
   });
 
   if (!response.ok) {
@@ -37,8 +41,14 @@ export function useUser() {
     mutationFn: async (data: { username: string; password: string; isLogin: boolean }) => {
       const response = await fetch(`/api/${data.isLogin ? 'login' : 'register'}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          username: data.username,
+          password: data.password
+        }),
         credentials: 'include',
       });
 
@@ -47,12 +57,19 @@ export function useUser() {
         throw new Error(error);
       }
 
-      return response.json();
+      const result = await response.json();
+      
+      // Wait for the user query to complete before redirecting
+      await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      const userData = await fetchUser();
+      if (!userData) {
+        throw new Error('Failed to fetch user data after login');
+      }
+      
+      return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       setLocation('/'); // Redirect to home after successful auth
-      window.location.reload(); // Refresh the page after login
     },
   });
 
@@ -61,6 +78,9 @@ export function useUser() {
       const response = await fetch('/api/logout', {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!response.ok) {
