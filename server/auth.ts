@@ -46,17 +46,16 @@ const store = new MemoryStore({
 export const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "chat-genius-session-secret",
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,
   proxy: true,
   store,
   name: 'connect.sid',
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    path: '/',
-    domain: process.env.NODE_ENV === 'production' ? '.amplifyapp.com' : undefined
+    path: '/'
   }
 });
 
